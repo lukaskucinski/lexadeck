@@ -20,8 +20,9 @@ npm run dev
 | `DATABASE_URL` | Supabase pooled connection (port 6543, `?pgbouncer=true`) — URL-encode special chars in the password |
 | `DIRECT_URL` | Supabase session connection (port 5432) — used by `prisma db push` |
 | `SITE_PASSWORD` | Gate password; unset disables the gate (local dev) |
-| `DEEPL_API_KEY` | DeepL API Free — fills missing translations |
+| `AZURE_TRANSLATOR_KEY` / `_ENDPOINT` / `_REGION` | Azure AI Translator F0 — primary translation (2M chars/mo free) |
 | `GEMINI_API_KEY` | Gemini API Free — example sentences + emoji |
+| `DEEPL_API_KEY` + `ENABLE_DEEPL_FALLBACK` | Optional fallback translator (lifetime quota — off by default) |
 
 ## Scripts
 

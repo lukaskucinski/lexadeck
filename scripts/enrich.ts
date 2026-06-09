@@ -1,13 +1,17 @@
 /**
  * One-off enrichment script. Two passes, both resumable; grammar rules skipped.
  *
- *   Pass 1 — DeepL (authoritative ES→EN): fills `translation` where NULL.
+ *   Pass 1 — Azure AI Translator F0 (primary ES→EN): fills `translation` where
+ *            NULL. DeepL is an optional fallback (ENABLE_DEEPL_FALLBACK=true);
+ *            its Developer-tier quota is LIFETIME, so it is off by default.
  *   Pass 2 — Gemini: fills `example`, `exampleEn`, `emoji`; sets `enrichedAt`.
  *
  * Usage:
  *   npx tsx scripts/enrich.ts [--limit N] [--dry-run]
  *
- * Env: DEEPL_API_KEY, DEEPL_API_BASE_URL, GEMINI_API_KEY, GEMINI_MODEL
+ * Env: AZURE_TRANSLATOR_KEY, AZURE_TRANSLATOR_ENDPOINT, AZURE_TRANSLATOR_REGION,
+ *      GEMINI_API_KEY, GEMINI_MODEL,
+ *      DEEPL_API_KEY + ENABLE_DEEPL_FALLBACK (optional)
  */
 import "dotenv/config";
 import { parseArgs } from "node:util";
@@ -29,8 +33,32 @@ const GEMINI_PACE_MS = 7_000; // free tier: 10 requests/min
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /* ------------------------------------------------------------------ */
-/* Pass 1 — DeepL translation                                          */
+/* Pass 1 — translation: Azure primary, DeepL optional fallback        */
 /* ------------------------------------------------------------------ */
+
+async function azureTranslate(texts: string[]): Promise<string[]> {
+  const key = process.env.AZURE_TRANSLATOR_KEY;
+  const endpoint =
+    process.env.AZURE_TRANSLATOR_ENDPOINT ?? "https://api.cognitive.microsofttranslator.com";
+  const region = process.env.AZURE_TRANSLATOR_REGION;
+  if (!key) throw new Error("AZURE_TRANSLATOR_KEY is not set in .env");
+  if (!region) throw new Error("AZURE_TRANSLATOR_REGION is not set in .env");
+
+  const res = await fetch(`${endpoint}/translate?api-version=3.0&from=es&to=en`, {
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": key,
+      "Ocp-Apim-Subscription-Region": region,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(texts.map((Text) => ({ Text }))),
+  });
+  if (!res.ok) {
+    throw new Error(`Azure Translator ${res.status}: ${await res.text()}`);
+  }
+  const data = (await res.json()) as { translations: { text: string }[] }[];
+  return data.map((item) => item.translations[0].text);
+}
 
 async function deeplTranslate(texts: string[]): Promise<string[]> {
   const key = process.env.DEEPL_API_KEY;
@@ -56,14 +84,26 @@ async function deeplTranslate(texts: string[]): Promise<string[]> {
   return data.translations.map((t) => t.text);
 }
 
-async function passDeepl(): Promise<void> {
+async function translateBatch(texts: string[]): Promise<{ provider: string; out: string[] }> {
+  try {
+    return { provider: "azure", out: await azureTranslate(texts) };
+  } catch (err) {
+    if (process.env.ENABLE_DEEPL_FALLBACK === "true") {
+      console.warn(`  Azure failed (${(err as Error).message}); falling back to DeepL`);
+      return { provider: "deepl_fallback", out: await deeplTranslate(texts) };
+    }
+    throw err;
+  }
+}
+
+async function passTranslate(): Promise<void> {
   const cards = await prisma.card.findMany({
     where: { translation: null, wordType: { not: "GRAMMAR" } },
     select: { id: true, term: true },
     orderBy: { createdAt: "asc" },
   });
 
-  console.log(`Pass 1 (DeepL): ${cards.length} cards missing translations`);
+  console.log(`Pass 1 (Azure Translator): ${cards.length} cards missing translations`);
   if (cards.length === 0 || DRY) {
     if (DRY && cards.length > 0) {
       console.log("  dry-run, would translate:", cards.map((c) => c.term).join(", "));
@@ -73,13 +113,13 @@ async function passDeepl(): Promise<void> {
 
   for (let i = 0; i < cards.length; i += 50) {
     const batch = cards.slice(i, i + 50);
-    const translations = await deeplTranslate(batch.map((c) => c.term));
+    const { provider, out } = await translateBatch(batch.map((c) => c.term));
     for (let j = 0; j < batch.length; j++) {
       await prisma.card.update({
         where: { id: batch[j].id },
-        data: { translation: translations[j] },
+        data: { translation: out[j] },
       });
-      console.log(`  ${batch[j].term} → ${translations[j]}`);
+      console.log(`  [${provider}] ${batch[j].term} → ${out[j]}`);
     }
   }
 }
@@ -232,7 +272,7 @@ async function passGemini(): Promise<void> {
 /* ------------------------------------------------------------------ */
 
 async function main() {
-  await passDeepl();
+  await passTranslate();
   await passGemini();
 
   const remaining = await prisma.card.count({
