@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { setCardWordType } from "@/lib/actions/cards";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
@@ -131,10 +131,15 @@ function KanbanColumn({
 
 export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[]; deckId: string }) {
   const [cards, setCards] = useState(initialCards);
+  const [prevInitial, setPrevInitial] = useState(initialCards);
   const [active, setActive] = useState<CardRow | null>(null);
   const [, startTransition] = useTransition();
 
-  useEffect(() => setCards(initialCards), [initialCards]);
+  // derived-state sync when the server re-renders with fresh data
+  if (prevInitial !== initialCards) {
+    setPrevInitial(initialCards);
+    setCards(initialCards);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),

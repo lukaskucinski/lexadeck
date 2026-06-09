@@ -1,18 +1,21 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useViewParams } from "./useViewParams";
 
 export function SearchBar({ placeholder = "Search term or translation" }) {
   const { searchParams, setParams } = useViewParams();
-  const [value, setValue] = useState(searchParams.get("q") ?? "");
+  const urlQ = searchParams.get("q") ?? "";
+  const [value, setValue] = useState(urlQ);
+  const [lastUrlQ, setLastUrlQ] = useState(urlQ);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // keep input in sync when URL changes externally (e.g. chip dismissed)
-  useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
-  }, [searchParams]);
+  // derived-state sync when the URL changes externally (e.g. filters cleared)
+  if (lastUrlQ !== urlQ) {
+    setLastUrlQ(urlQ);
+    setValue(urlQ);
+  }
 
   function onChange(next: string) {
     setValue(next);

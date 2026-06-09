@@ -61,8 +61,8 @@ export function StudySession({
   const [counts, setCounts] = useState<Counts>({ again: 0, hard: 0, good: 0, easy: 0 });
   const [exitDir, setExitDir] = useState<1 | -1>(1);
   const [wash, setWash] = useState<string | null>(null);
+  const [studied, setStudied] = useState<ReadonlySet<string>>(new Set());
   const sessionPromiseRef = useRef<Promise<string> | null>(null);
-  const studiedRef = useRef<Set<string>>(new Set());
 
   const current = queue[0] ?? null;
 
@@ -75,8 +75,8 @@ export function StudySession({
   const finish = useCallback(async () => {
     setPhase("done");
     const sessionId = await sessionPromiseRef.current;
-    if (sessionId) await endSession(sessionId, studiedRef.current.size);
-  }, []);
+    if (sessionId) await endSession(sessionId, studied.size);
+  }, [studied]);
 
   const rate = useCallback(
     (rating: Grade) => {
@@ -92,7 +92,7 @@ export function StudySession({
         return { ...prev, [key]: prev[key] + 1 };
       });
       setDone((d) => d + 1);
-      studiedRef.current.add(card.id);
+      setStudied((prev) => (prev.has(card.id) ? prev : new Set(prev).add(card.id)));
       setRevealed(false);
 
       // optimistic pop; server decides if the card re-enters the session
@@ -121,9 +121,12 @@ export function StudySession({
     [current, revealed],
   );
 
-  // session ends when the queue drains during active phase
+  // session ends when the queue stays drained — the grace period lets an
+  // in-flight "Again" re-queue land instead of ending the session under it
   useEffect(() => {
-    if (phase === "active" && queue.length === 0) void finish();
+    if (phase !== "active" || queue.length > 0) return;
+    const timer = setTimeout(() => void finish(), 800);
+    return () => clearTimeout(timer);
   }, [phase, queue.length, finish]);
 
   // keyboard: space/enter reveal, 1-4 rate
@@ -200,7 +203,7 @@ export function StudySession({
         <div className="mt-8 w-full border-[1.5px] border-line">
           <div className="grid grid-cols-2">
             <div className="border-r border-soft px-5 py-4">
-              <div className="tnum text-4xl font-black">{studiedRef.current.size}</div>
+              <div className="tnum text-4xl font-black">{studied.size}</div>
               <div className="label-caps mt-1 text-muted">Cards studied</div>
             </div>
             <div className="px-5 py-4">

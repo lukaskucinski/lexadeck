@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { deleteCards, updateCardInline } from "@/lib/actions/cards";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
@@ -32,11 +32,14 @@ function EditableCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
   const [current, setCurrent] = useState(value ?? "");
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  // derived-state sync when the server re-renders with fresh data
+  if (prevValue !== value) {
+    setPrevValue(value);
     setCurrent(value ?? "");
     setDraft(value ?? "");
-  }, [value]);
+  }
 
   async function save() {
     setEditing(false);
@@ -76,6 +79,31 @@ function EditableCell({
   );
 }
 
+function SortHeader({
+  id,
+  sort,
+  dir,
+  onToggle,
+  children,
+}: {
+  id: string;
+  sort: string;
+  dir: "asc" | "desc";
+  onToggle: (id: string) => void;
+  children: React.ReactNode;
+}) {
+  const active = sort === id;
+  return (
+    <button
+      onClick={() => onToggle(id)}
+      className={`label-caps inline-flex items-center gap-1 ${active ? "text-ink" : "text-muted hover:text-ink"}`}
+    >
+      {children}
+      {active && (dir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+    </button>
+  );
+}
+
 export function CardListTable({
   cards,
   sort,
@@ -106,19 +134,6 @@ export function CardListTable({
   }
 
   const allSelected = cards.length > 0 && cards.every((c) => selected.has(c.id));
-
-  function SortHeader({ id, children }: { id: string; children: React.ReactNode }) {
-    const active = sort === id;
-    return (
-      <button
-        onClick={() => toggleSort(id)}
-        className={`label-caps inline-flex items-center gap-1 ${active ? "text-ink" : "text-muted hover:text-ink"}`}
-      >
-        {children}
-        {active && (dir === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-      </button>
-    );
-  }
 
   return (
     <div className="border-[1.5px] border-line">
@@ -154,12 +169,12 @@ export function CardListTable({
                 className="accent-[var(--c-ink)]"
               />
             </th>
-            <th className="px-3 py-2.5"><SortHeader id="term">Term</SortHeader></th>
+            <th className="px-3 py-2.5"><SortHeader id="term" sort={sort} dir={dir} onToggle={toggleSort}>Term</SortHeader></th>
             <th className="px-3 py-2.5"><span className="label-caps text-muted">Translation</span></th>
             {showDeck && <th className="px-3 py-2.5"><span className="label-caps text-muted">Deck</span></th>}
-            <th className="px-3 py-2.5"><SortHeader id="wordType">Type</SortHeader></th>
+            <th className="px-3 py-2.5"><SortHeader id="wordType" sort={sort} dir={dir} onToggle={toggleSort}>Type</SortHeader></th>
             <th className="px-3 py-2.5"><span className="label-caps text-muted">State</span></th>
-            <th className="px-3 py-2.5"><SortHeader id="due">Next</SortHeader></th>
+            <th className="px-3 py-2.5"><SortHeader id="due" sort={sort} dir={dir} onToggle={toggleSort}>Next</SortHeader></th>
             <th className="w-10 px-3 py-2.5" />
           </tr>
         </thead>
