@@ -27,8 +27,9 @@ const { values: args } = parseArgs({
 const LIMIT = args.limit ? Number(args.limit) : Infinity;
 const DRY = args["dry-run"];
 
-const GEMINI_BATCH = 20;
-const GEMINI_PACE_MS = 7_000; // free tier: 10 requests/min
+const GEMINI_BATCH = Number(process.env.GEMINI_BATCH ?? 20);
+const GEMINI_PACE_MS = 10_000; // stay well under free-tier RPM
+const GEMINI_RETRY_DELAY_MS = 30_000; // backoff before retrying a failed batch
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -239,10 +240,20 @@ async function passGemini(): Promise<void> {
     return;
   }
 
+  async function enrichWithRetry(batch: typeof cards): Promise<EnrichmentItem[]> {
+    try {
+      return await geminiEnrich(batch);
+    } catch (err) {
+      console.warn(`  transient failure (${(err as Error).message.slice(0, 80)}…) — retrying in 30s`);
+      await sleep(GEMINI_RETRY_DELAY_MS);
+      return geminiEnrich(batch);
+    }
+  }
+
   for (let i = 0; i < cards.length; i += GEMINI_BATCH) {
     const batch = cards.slice(i, i + GEMINI_BATCH);
     try {
-      const items = await geminiEnrich(batch);
+      const items = await enrichWithRetry(batch);
       const byId = new Map(items.map((item) => [item.id, item]));
       for (const card of batch) {
         const item = byId.get(card.id);
