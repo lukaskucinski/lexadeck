@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LexaDeck — Variant B · Ink Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Schibsted+Grotesk:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..600;1,8..60,400..600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #131219;   /* deep ink, warm-violet black */
+    --bg-deep:   #0E0D13;
+    --surface:   #1B1A22;
+    --plate:     #201F29;
+    --cream:     #F1EADC;   /* letterpress cream */
+    --muted:     #8E8798;
+    --hairline:  #2C2A36;
+    --frame:     #3A3745;
+
+    --coral:     #FF7A5C;
+    --blue:      #8B9AFF;
+    --green:     #46D9A0;
+    --amber:     #F2BC5C;
+    --teal:      #3CD9C4;
+    --purple:    #C49AF7;
+
+    --display: "Fraunces", serif;
+    --content: "Source Serif 4", serif;
+    --ui:      "Schibsted Grotesk", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    background: var(--bg);
+    color: var(--cream);
+    font-family: var(--ui);
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.5rem, 6vw, 6rem) 6rem;
+    position: relative;
+  }
+  /* faint ink-wash vignette, no glow */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 70% -10%, rgba(241,234,220,0.04), transparent 60%);
+  }
+  main { position: relative; max-width: 1280px; margin: 0 auto; }
+
+  .spec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 1px solid var(--frame);
+    padding-bottom: 0.9rem; margin-bottom: 3.5rem;
+  }
+  .wordmark {
+    font-family: var(--display); font-size: 1.65rem; font-weight: 500;
+    font-variation-settings: "opsz" 40; letter-spacing: 0;
+  }
+  .wordmark em { font-style: italic; font-weight: 340; color: var(--coral); }
+  .spec-head .tag {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--muted);
+  }
+
+  .section-label {
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: center; gap: 0.75rem;
+    margin: 4rem 0 1.5rem;
+  }
+  .section-label::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+
+  /* ---------- study ---------- */
+  .study-row { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
+  @media (max-width: 980px) { .study-row { grid-template-columns: 1fr; } }
+  .stage { display: flex; flex-direction: column; gap: 1.4rem; }
+  .stage-bar {
+    display: flex; align-items: center; gap: 1rem;
+    font-size: 0.78rem; color: var(--muted); font-weight: 500;
+  }
+  .stage-bar .deckname { font-weight: 700; color: var(--cream); letter-spacing: 0.14em; font-size: 0.72rem; }
+  .progress-track { flex: 1; height: 2px; background: var(--hairline); position: relative; }
+  .progress-track i { position: absolute; inset: 0 76% 0 0; background: var(--coral); display: block; }
+  .counter { font-variant-numeric: tabular-nums; }
+
+  /* letterpress plate card */
+  .flashcard {
+    background: linear-gradient(178deg, var(--plate), var(--surface) 70%);
+    border: 1px solid var(--frame);
+    border-radius: 6px;
+    position: relative;
+    min-height: 380px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(241,234,220,0.06);
+  }
+  /* printed inner frame */
+  .flashcard::after {
+    content: ""; position: absolute; inset: 10px;
+    border: 1px solid rgba(241,234,220,0.12);
+    border-radius: 3px; pointer-events: none;
+  }
+  .card-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1.5rem 1.8rem 0;
+  }
+  .card-meta .kind {
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.26em;
+    text-transform: uppercase; color: var(--blue);
+  }
+  .card-meta .kind span { color: var(--muted); font-weight: 500; }
+  .pip { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); box-shadow: inset 0 -1px 1px rgba(0,0,0,0.5); }
+
+  .card-front-body {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1.3rem;
+    padding: 1rem 2rem 2.6rem;
+  }
+  .term {
+    font-family: var(--display);
+    font-weight: 330;
+    font-variation-settings: "opsz" 144;
+    font-size: clamp(3.2rem, 5.5vw, 4.4rem);
+    letter-spacing: 0.005em;
+    line-height: 1;
+    color: var(--cream);
+    text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+  }
+  .term i { font-style: italic; }
+  .reveal-hint {
+    font-size: 0.68rem; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+
+  .card-back-body { flex: 1; padding: 0.7rem 2rem 1.6rem 2.1rem; display: flex; flex-direction: column; position: relative; z-index: 1; }
+  .back-term { font-family: var(--display); font-weight: 480; font-variation-settings: "opsz" 60; font-size: 1.4rem; }
+  .back-term small {
+    font-family: var(--ui); font-size: 0.62rem; font-weight: 700; color: var(--blue);
+    letter-spacing: 0.22em; text-transform: uppercase; margin-left: 0.7rem; vertical-align: 0.35em;
+  }
+  .translation {
+    font-family: var(--content); font-size: 1.6rem; font-weight: 460;
+    margin-top: 0.85rem; line-height: 1.25; color: var(--cream);
+  }
+  .entry-rule { border: none; border-top: 1px solid var(--hairline); margin: 1.15rem 0 1rem; }
+  .example { font-family: var(--content); font-style: italic; font-size: 1.02rem; color: #C9C1B2; line-height: 1.6; }
+  .example b { font-weight: 600; color: var(--coral); font-style: italic; }
+  .example-gloss { font-family: var(--ui); font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; }
+  .conj { margin-top: 1rem; display: flex; gap: 1.4rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+  .conj b { color: var(--cream); font-weight: 500; font-family: var(--content); font-style: italic; }
+  .card-foot {
+    margin-top: auto; padding-top: 1rem;
+    display: flex; gap: 1.5rem; font-size: 0.68rem; color: var(--muted);
+    letter-spacing: 0.08em; font-variant-numeric: tabular-nums; text-transform: uppercase;
+  }
+
+  .ratings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; }
+  .rate {
+    appearance: none; cursor: pointer;
+    background: var(--surface);
+    border: 1px solid var(--frame);
+    border-radius: 5px; height: 54px;
+    font-family: var(--ui); font-size: 0.9rem; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .rate:hover { transform: translateY(-1px); }
+  .rate small {
+    font-size: 0.6rem; font-weight: 600; color: var(--muted); letter-spacing: 0.12em;
+    border: 1px solid var(--hairline); border-radius: 3px; padding: 0 4px; margin-top: 2px;
+  }
+  .rate.again { color: var(--coral); border-color: color-mix(in srgb, var(--coral) 40%, var(--frame)); }
+  .rate.hard  { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 35%, var(--frame)); }
+  .rate.good  { color: var(--blue);  border-color: color-mix(in srgb, var(--blue) 35%, var(--frame)); }
+  .rate.easy  { color: var(--green); border-color: color-mix(in srgb, var(--green) 35%, var(--frame)); }
+
+  /* ---------- dashboard ---------- */
+  .dash { display: grid; grid-template-columns: 1.25fr 1fr; gap: 3.5rem; align-items: start; }
+  @media (max-width: 980px) { .dash { grid-template-columns: 1fr; } }
+  .greeting {
+    font-family: var(--display); font-weight: 320;
+    font-variation-settings: "opsz" 120;
+    font-size: clamp(2.2rem, 4vw, 3.2rem); letter-spacing: 0; line-height: 1.1;
+  }
+  .greeting em { font-style: italic; color: var(--coral); }
+  .due-line { margin-top: 1rem; font-size: 1rem; color: var(--muted); font-family: var(--content); }
+  .due-line strong { color: var(--cream); font-weight: 600; }
+  .start-btn {
+    margin-top: 1.7rem; display: inline-flex; align-items: center; gap: 0.8rem;
+    background: var(--cream); color: var(--bg-deep);
+    font-family: var(--ui); font-weight: 700; font-size: 0.92rem; letter-spacing: 0.04em;
+    border: none; border-radius: 4px; padding: 0.95rem 1.8rem; cursor: pointer;
+  }
+
+  .deck-tile {
+    background: var(--surface); border: 1px solid var(--frame); border-radius: 6px;
+    overflow: hidden; box-shadow: 0 14px 34px rgba(0,0,0,0.4);
+  }
+  .tile-head {
+    padding: 1.3rem 1.6rem 0; display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .tile-name { font-family: var(--display); font-weight: 420; font-size: 1.5rem; font-variation-settings: "opsz" 50; }
+  .tile-lang { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.24em; color: var(--coral); text-transform: uppercase; }
+  .tile-body { padding: 1.1rem 1.6rem 1.4rem; display: flex; gap: 1.4rem; align-items: center; }
+  .tile-stats { display: flex; gap: 1.6rem; flex: 1; }
+  .tstat .n { font-family: var(--display); font-weight: 380; font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+  .tstat .n.due { color: var(--coral); }
+  .tstat .l { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-top: 0.1rem; }
+  .ring { width: 84px; height: 84px; position: relative; flex-shrink: 0; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .pct {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: var(--display); font-weight: 420; font-size: 1.1rem;
+  }
+  .ring .pct small { font-family: var(--ui); font-size: 0.5rem; letter-spacing: 0.18em; color: var(--muted); font-weight: 700; }
+  .tile-foot {
+    border-top: 1px solid var(--hairline); padding: 0.7rem 1.6rem;
+    font-size: 0.72rem; color: var(--muted); display: flex; justify-content: space-between;
+  }
+  /* ink swatch strip — word type distribution as printed registration marks */
+  .regmarks { display: flex; gap: 4px; }
+  .regmarks i { width: 14px; height: 5px; border-radius: 1px; display: block; }
+
+  /* ---------- kanban ---------- */
+  .board { display: flex; gap: 1.4rem; overflow: hidden; }
+  .col { width: 300px; flex-shrink: 0; }
+  .col-head { display: flex; align-items: center; gap: 0.6rem; padding-bottom: 0.7rem; margin-bottom: 0.9rem; border-bottom: 1px solid var(--frame); }
+  .col-head .swatch { width: 9px; height: 9px; border-radius: 2px; background: var(--blue); }
+  .col.nouns .swatch { background: var(--coral); }
+  .col.adj .swatch { background: var(--purple); }
+  .col-head .name { font-weight: 600; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; }
+  .col-head .count { margin-left: auto; font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .kcard {
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 4px;
+    padding: 0.85rem 1rem; margin-bottom: 0.7rem; position: relative;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 0.8rem;
+  }
+  .kcard .kterm { font-family: var(--display); font-weight: 420; font-size: 1.05rem; font-variation-settings: "opsz" 30; }
+  .kcard .ktrans { font-family: var(--content); font-style: italic; font-size: 0.82rem; color: var(--muted); }
+  .kcard .kstate { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; align-self: center; }
+  .kstate.due { background: var(--coral); }
+  .kstate.learning { background: var(--amber); }
+  .kstate.new { background: var(--blue); }
+  .kstate.mastered { background: var(--teal); }
+  .peek { opacity: 0.4; }
+</style>
+</head>
+<body>
+<main>
+  <header class="spec-head">
+    <div class="wordmark">Lexa<em>Deck</em></div>
+    <div class="tag">Variant B · Ink Studio</div>
+  </header>
+
+  <div class="section-label">Study — front &amp; revealed</div>
+  <div class="study-row">
+    <div class="stage">
+      <div class="stage-bar">
+        <span>← Exit</span>
+        <span class="deckname">ESPAÑOL</span>
+        <div class="progress-track"><i></i></div>
+        <span class="counter">12 / 50</span>
+      </div>
+      <div class="flashcard">
+        <div class="card-meta">
+          <div class="kind">Verb <span>· Spanish</span></div>
+          <div class="pip"></div>
+        </div>
+        <div class="card-front-body">
+          <div class="term"><i>fallecer</i></div>
+          <div class="reveal-hint">Tap to reveal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span>← Exit</span>
+        <span class="deckname">ESPAÑOL</span>
+        <div class="progress-track"><i></i></div>
+        <span class="counter">12 / 50</span>
+      </div>
+      <div class="flashcard">
+        <div class="card-meta">
+          <div class="kind">Verb <span>· Spanish</span></div>
+          <div class="pip"></div>
+        </div>
+        <div class="card-back-body">
+          <div style="margin-top:0.5rem">
+            <span class="back-term"><i>fallecer</i> <small>verb</small></span>
+          </div>
+          <div class="translation">to pass away; to die</div>
+          <hr class="entry-rule">
+          <p class="example">El escritor <b>falleció</b> en París a los ochenta años.</p>
+          <p class="example-gloss">The writer passed away in Paris at eighty.</p>
+          <div class="conj">
+            <span><b>fallezco</b> yo</span>
+            <span><b>fallece</b> él/ella</span>
+            <span><b>falleció</b> pret.</span>
+          </div>
+          <div class="card-foot">
+            <span>3 reviews</span><span>stability 3.2d</span><span>next · tomorrow</span>
+          </div>
+        </div>
+      </div>
+      <div class="ratings">
+        <button class="rate again">Again<small>1</small></button>
+        <button class="rate hard">Hard<small>2</small></button>
+        <button class="rate good">Good<small>3</small></button>
+        <button class="rate easy">Easy<small>4</small></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Dashboard slice</div>
+  <div class="dash">
+    <div>
+      <h1 class="greeting">Buenas noches, <em>Lukas</em>.</h1>
+      <p class="due-line"><strong>50 cards</strong> are ready for review — <strong>1,007</strong> in rotation.</p>
+      <button class="start-btn">Start review →</button>
+    </div>
+    <div class="deck-tile">
+      <div class="tile-head">
+        <div class="tile-name"><i>Español</i></div>
+        <div class="tile-lang">Spanish · ES</div>
+      </div>
+      <div class="tile-body">
+        <div class="tile-stats">
+          <div class="tstat"><div class="n">1,007</div><div class="l">Cards</div></div>
+          <div class="tstat"><div class="n due">50</div><div class="l">Due</div></div>
+          <div class="tstat"><div class="n">214</div><div class="l">Verbs</div></div>
+        </div>
+        <div class="ring">
+          <svg width="84" height="84" viewBox="0 0 84 84">
+            <circle cx="42" cy="42" r="36" stroke="#2C2A36" stroke-width="6" fill="none"/>
+            <circle cx="42" cy="42" r="36" stroke="#3CD9C4" stroke-width="6" fill="none"
+                    stroke-linecap="round" stroke-dasharray="226.2" stroke-dashoffset="149.3"/>
+          </svg>
+          <div class="pct">34%<small>MASTERED</small></div>
+        </div>
+      </div>
+      <div class="tile-foot">
+        <span>Last studied 2 days ago</span>
+        <span class="regmarks">
+          <i style="background:var(--blue)"></i>
+          <i style="background:var(--coral)"></i>
+          <i style="background:var(--purple)"></i>
+          <i style="background:var(--green)"></i>
+          <i style="background:var(--amber)"></i>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Kanban fragment</div>
+  <div class="board">
+    <div class="col">
+      <div class="col-head"><span class="swatch"></span><span class="name">Verbs</span><span class="count">214</span></div>
+      <div class="kcard"><div><div class="kterm">fallecer</div><div class="ktrans">to pass away</div></div><span class="kstate due"></span></div>
+      <div class="kcard"><div><div class="kterm">empezar</div><div class="ktrans">to begin</div></div><span class="kstate learning"></span></div>
+      <div class="kcard"><div><div class="kterm">lograr</div><div class="ktrans">to achieve</div></div><span class="kstate new"></span></div>
+    </div>
+    <div class="col nouns">
+      <div class="col-head"><span class="swatch"></span><span class="name">Nouns · F</span><span class="count">183</span></div>
+      <div class="kcard"><div><div class="kterm">la bufanda</div><div class="ktrans">the scarf</div></div><span class="kstate mastered"></span></div>
+      <div class="kcard"><div><div class="kterm">la esquina</div><div class="ktrans">the corner</div></div><span class="kstate due"></span></div>
+    </div>
+    <div class="col adj peek">
+      <div class="col-head"><span class="swatch"></span><span class="name">Adjectives</span><span class="count">156</span></div>
+      <div class="kcard"><div><div class="kterm">acogedor</div><div class="ktrans">cozy</div></div><span class="kstate learning"></span></div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

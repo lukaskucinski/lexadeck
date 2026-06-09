@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LexaDeck — Variant C · Swiss Typographic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:     #FAFAF6;
+    --ink:    #16150F;
+    --muted:  #74726A;
+    --line:   #16150F;
+    --soft:   #E4E2D8;
+
+    --blue:   #2B50E0;   /* verb */
+    --coral:  #F4502E;   /* noun */
+    --green:  #0E9D62;
+    --amber:  #EFA51E;
+    --teal:   #0BA59A;
+    --purple: #8D4FE0;
+
+    --ui: "Archivo", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 6vw, 6rem) 6rem;
+  }
+  main { max-width: 1280px; margin: 0 auto; }
+
+  .spec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 3px solid var(--line);
+    padding-bottom: 0.8rem; margin-bottom: 3.5rem;
+  }
+  .wordmark {
+    font-weight: 900; font-size: 1.5rem; letter-spacing: -0.03em;
+    font-variation-settings: "wdth" 115;
+    text-transform: lowercase;
+  }
+  .wordmark span { color: var(--coral); }
+  .spec-head .tag { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+
+  .section-label {
+    display: flex; align-items: baseline; gap: 1rem;
+    margin: 4.5rem 0 1.5rem;
+    border-top: 1px solid var(--line); padding-top: 0.6rem;
+  }
+  .section-label .idx { font-weight: 800; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+  .section-label .txt { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+
+  /* ---------- study ---------- */
+  .study-row { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
+  @media (max-width: 980px) { .study-row { grid-template-columns: 1fr; } }
+  .stage { display: flex; flex-direction: column; gap: 1.3rem; }
+  .stage-bar { display: flex; align-items: center; gap: 1rem; font-size: 0.74rem; font-weight: 600; }
+  .stage-bar .exit { color: var(--muted); }
+  .stage-bar .deckname { letter-spacing: 0.12em; text-transform: uppercase; }
+  .progress-track { flex: 1; height: 4px; background: var(--soft); position: relative; }
+  .progress-track i { position: absolute; inset: 0 76% 0 0; background: var(--ink); display: block; }
+  .counter { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+  .flashcard {
+    background: var(--bg);
+    border: 1.5px solid var(--line);
+    min-height: 380px;
+    display: flex; flex-direction: column;
+  }
+  .card-meta {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.7rem;
+    padding: 1rem 1.3rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .typebox { width: 12px; height: 12px; background: var(--blue); }
+  .card-meta .kind { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+  .card-meta .kind span { color: var(--muted); font-weight: 500; }
+  .card-meta .due-flag {
+    font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--bg); background: var(--coral); padding: 3px 7px;
+  }
+  .card-front-body {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 1.5rem 2rem 1.5rem 1.7rem; gap: 1rem;
+  }
+  .term {
+    font-weight: 850;
+    font-variation-settings: "wdth" 120;
+    font-size: clamp(3.4rem, 6vw, 5rem);
+    letter-spacing: -0.045em; line-height: 0.95;
+    text-transform: lowercase;
+  }
+  .reveal-hint { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; color: var(--muted); }
+  .card-front-foot {
+    border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  }
+  .card-front-foot div { padding: 0.55rem 1.3rem; border-right: 1px solid var(--soft); }
+  .card-front-foot div:last-child { border-right: none; }
+  .card-front-foot b { color: var(--ink); font-weight: 800; }
+
+  .card-back-body { flex: 1; padding: 1.4rem 1.7rem 1.1rem; display: flex; flex-direction: column; }
+  .back-line { display: flex; align-items: baseline; gap: 0.8rem; }
+  .back-term { font-weight: 850; font-variation-settings: "wdth" 120; font-size: 1.5rem; letter-spacing: -0.03em; text-transform: lowercase; }
+  .back-kind { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--blue); }
+  .translation {
+    font-weight: 500; font-size: 1.7rem; letter-spacing: -0.02em; line-height: 1.15;
+    margin-top: 1rem;
+  }
+  .example-block { margin-top: 1.3rem; border-left: 2px solid var(--line); padding-left: 1rem; }
+  .example { font-size: 1rem; font-weight: 500; line-height: 1.5; }
+  .example b { color: var(--blue); font-weight: 700; }
+  .example-gloss { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; font-weight: 500; }
+  .conj-grid {
+    margin-top: 1.3rem;
+    display: grid; grid-template-columns: repeat(3, auto); gap: 0 2rem; width: max-content;
+    font-size: 0.78rem; font-variant-numeric: tabular-nums;
+  }
+  .conj-grid .c-form { font-weight: 800; }
+  .conj-grid .c-label { color: var(--muted); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 1px; }
+  .card-back-foot {
+    border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  }
+  .card-back-foot div { padding: 0.55rem 1.7rem; border-right: 1px solid var(--soft); }
+  .card-back-foot div:last-child { border-right: none; }
+  .card-back-foot b { color: var(--ink); font-weight: 800; }
+
+  .ratings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1.5px solid var(--line); }
+  .rate {
+    appearance: none; cursor: pointer; background: var(--bg);
+    border: none; border-right: 1px solid var(--line);
+    height: 54px;
+    font-family: var(--ui); font-size: 0.84rem; font-weight: 800; letter-spacing: 0.02em;
+    display: flex; align-items: center; justify-content: center; gap: 0.55rem;
+    text-transform: uppercase;
+    transition: background 0.1s ease;
+  }
+  .rate:last-child { border-right: none; }
+  .rate:hover { background: var(--soft); }
+  .rate .sw { width: 10px; height: 10px; }
+  .rate.again .sw { background: var(--coral); }
+  .rate.hard  .sw { background: var(--amber); }
+  .rate.good  .sw { background: var(--blue); }
+  .rate.easy  .sw { background: var(--green); }
+  .rate small { font-size: 0.6rem; font-weight: 600; color: var(--muted); }
+
+  /* ---------- dashboard ---------- */
+  .dash { display: grid; grid-template-columns: 1.25fr 1fr; gap: 3.5rem; align-items: start; }
+  @media (max-width: 980px) { .dash { grid-template-columns: 1fr; } }
+  .greeting {
+    font-weight: 900; font-variation-settings: "wdth" 122;
+    font-size: clamp(2.6rem, 5vw, 4rem); letter-spacing: -0.045em; line-height: 0.95;
+    text-transform: lowercase;
+  }
+  .greeting span { color: var(--coral); }
+  .due-line { margin-top: 1.1rem; font-size: 0.98rem; color: var(--muted); font-weight: 500; max-width: 36ch; }
+  .due-line strong { color: var(--ink); font-weight: 800; }
+  .start-btn {
+    margin-top: 1.7rem; display: inline-flex; align-items: center; gap: 0.9rem;
+    background: var(--ink); color: var(--bg);
+    font-family: var(--ui); font-weight: 800; font-size: 0.86rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border: none; padding: 1rem 1.9rem; cursor: pointer;
+  }
+
+  .deck-tile { border: 1.5px solid var(--line); background: var(--bg); }
+  .tile-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--line);
+  }
+  .tile-name { font-weight: 850; font-variation-settings: "wdth" 120; font-size: 1.5rem; letter-spacing: -0.03em; text-transform: lowercase; }
+  .tile-lang { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+  .tile-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .tile-grid .cell { padding: 1rem 1.4rem 1.1rem; border-right: 1px solid var(--soft); }
+  .tile-grid .cell:last-child { border-right: none; }
+  .cell .n { font-weight: 900; font-size: 1.9rem; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .cell .n.due { color: var(--coral); }
+  .cell .l { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-top: 0.4rem; }
+  /* mastery as a segmented meter, not a ring — swiss = rational */
+  .meter { border-top: 1px solid var(--line); padding: 1rem 1.4rem 1.2rem; }
+  .meter .m-label { display: flex; justify-content: space-between; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.55rem; }
+  .meter .m-label b { color: var(--ink); }
+  .meter .m-track { display: flex; gap: 3px; height: 12px; }
+  .meter .m-track i { flex: 1; background: var(--soft); }
+  .meter .m-track i.f { background: var(--teal); }
+  .tile-foot { border-top: 1px solid var(--line); padding: 0.65rem 1.4rem; font-size: 0.68rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; }
+
+  /* ---------- kanban ---------- */
+  .board { display: flex; gap: 0; border: 1.5px solid var(--line); overflow: hidden; width: max-content; max-width: 100%; }
+  .col { width: 300px; flex-shrink: 0; border-right: 1px solid var(--line); }
+  .col:last-child { border-right: none; }
+  .col-head {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.8rem 1.1rem; border-bottom: 1px solid var(--line);
+  }
+  .col-head .swatch { width: 11px; height: 11px; background: var(--blue); }
+  .col.nouns .swatch { background: var(--coral); }
+  .col.adj .swatch { background: var(--purple); }
+  .col-head .name { font-weight: 800; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; }
+  .col-head .count { margin-left: auto; font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .kcard {
+    padding: 0.8rem 1.1rem; border-bottom: 1px solid var(--soft);
+    display: flex; justify-content: space-between; align-items: center; gap: 0.8rem;
+  }
+  .kcard:last-child { border-bottom: none; }
+  .kcard .kterm { font-weight: 800; font-size: 0.98rem; letter-spacing: -0.02em; text-transform: lowercase; }
+  .kcard .ktrans { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+  .kcard .kstate { width: 9px; height: 9px; flex-shrink: 0; }
+  .kstate.due { background: var(--coral); }
+  .kstate.learning { background: var(--amber); }
+  .kstate.new { background: var(--blue); }
+  .kstate.mastered { background: var(--teal); }
+  .peek { opacity: 0.45; }
+</style>
+</head>
+<body>
+<main>
+  <header class="spec-head">
+    <div class="wordmark">lexadeck<span>.</span></div>
+    <div class="tag">Variant C · Swiss Typographic</div>
+  </header>
+
+  <div class="section-label"><span class="idx">01</span><span class="txt">Study — front &amp; revealed</span></div>
+  <div class="study-row">
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="exit">← Exit</span>
+        <span class="deckname">Español</span>
+        <div class="progress-track"><i></i></div>
+        <span class="counter">12/50</span>
+      </div>
+      <div class="flashcard">
+        <div class="card-meta">
+          <span class="typebox"></span>
+          <span class="kind">Verb <span>· ES</span></span>
+          <span class="due-flag">Due</span>
+        </div>
+        <div class="card-front-body">
+          <div class="term">fallecer</div>
+          <div class="reveal-hint">Space to reveal</div>
+        </div>
+        <div class="card-front-foot">
+          <div><b>3</b> reviews</div>
+          <div><b>3.2d</b> stability</div>
+          <div>added <b>apr 23</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="exit">← Exit</span>
+        <span class="deckname">Español</span>
+        <div class="progress-track"><i></i></div>
+        <span class="counter">12/50</span>
+      </div>
+      <div class="flashcard">
+        <div class="card-meta">
+          <span class="typebox"></span>
+          <span class="kind">Verb <span>· ES</span></span>
+          <span class="due-flag">Due</span>
+        </div>
+        <div class="card-back-body">
+          <div class="back-line">
+            <span class="back-term">fallecer</span>
+            <span class="back-kind">verb</span>
+          </div>
+          <div class="translation">to pass away; to die</div>
+          <div class="example-block">
+            <p class="example">El escritor <b>falleció</b> en París a los ochenta años.</p>
+            <p class="example-gloss">The writer passed away in Paris at eighty.</p>
+          </div>
+          <div class="conj-grid">
+            <div><div class="c-form">fallezco</div><div class="c-label">yo</div></div>
+            <div><div class="c-form">fallece</div><div class="c-label">él/ella</div></div>
+            <div><div class="c-form">falleció</div><div class="c-label">pret.</div></div>
+          </div>
+        </div>
+        <div class="card-back-foot">
+          <div><b>3</b> reviews</div>
+          <div><b>3.2d</b> stability</div>
+          <div>next <b>tomorrow</b></div>
+        </div>
+      </div>
+      <div class="ratings">
+        <button class="rate again"><span class="sw"></span>Again<small>1</small></button>
+        <button class="rate hard"><span class="sw"></span>Hard<small>2</small></button>
+        <button class="rate good"><span class="sw"></span>Good<small>3</small></button>
+        <button class="rate easy"><span class="sw"></span>Easy<small>4</small></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label"><span class="idx">02</span><span class="txt">Dashboard slice</span></div>
+  <div class="dash">
+    <div>
+      <h1 class="greeting">buenos días,<br><span>lukas.</span></h1>
+      <p class="due-line"><strong>50 cards</strong> ready for review across <strong>1,007</strong> in rotation.</p>
+      <button class="start-btn">Start review →</button>
+    </div>
+    <div class="deck-tile">
+      <div class="tile-head">
+        <span class="tile-name">español</span>
+        <span class="tile-lang">Spanish · ES</span>
+      </div>
+      <div class="tile-grid">
+        <div class="cell"><div class="n">1,007</div><div class="l">Cards</div></div>
+        <div class="cell"><div class="n due">50</div><div class="l">Due</div></div>
+        <div class="cell"><div class="n">214</div><div class="l">Verbs</div></div>
+      </div>
+      <div class="meter">
+        <div class="m-label"><span>Mastered</span><b>34%</b></div>
+        <div class="m-track">
+          <i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </div>
+      <div class="tile-foot">Last studied 2 days ago</div>
+    </div>
+  </div>
+
+  <div class="section-label"><span class="idx">03</span><span class="txt">Kanban fragment</span></div>
+  <div class="board">
+    <div class="col">
+      <div class="col-head"><span class="swatch"></span><span class="name">Verbs</span><span class="count">214</span></div>
+      <div class="kcard"><div><div class="kterm">fallecer</div><div class="ktrans">to pass away</div></div><span class="kstate due"></span></div>
+      <div class="kcard"><div><div class="kterm">empezar</div><div class="ktrans">to begin</div></div><span class="kstate learning"></span></div>
+      <div class="kcard"><div><div class="kterm">lograr</div><div class="ktrans">to achieve</div></div><span class="kstate new"></span></div>
+    </div>
+    <div class="col nouns">
+      <div class="col-head"><span class="swatch"></span><span class="name">Nouns · F</span><span class="count">183</span></div>
+      <div class="kcard"><div><div class="kterm">la bufanda</div><div class="ktrans">the scarf</div></div><span class="kstate mastered"></span></div>
+      <div class="kcard"><div><div class="kterm">la esquina</div><div class="ktrans">the corner</div></div><span class="kstate due"></span></div>
+      <div class="kcard"><div><div class="kterm">la receta</div><div class="ktrans">the recipe</div></div><span class="kstate new"></span></div>
+    </div>
+    <div class="col adj peek">
+      <div class="col-head"><span class="swatch"></span><span class="name">Adjectives</span><span class="count">156</span></div>
+      <div class="kcard"><div><div class="kterm">acogedor</div><div class="ktrans">cozy</div></div><span class="kstate learning"></span></div>
+      <div class="kcard"><div><div class="kterm">hinchado</div><div class="ktrans">swollen</div></div><span class="kstate due"></span></div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

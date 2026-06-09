@@ -1,26 +1,128 @@
 @import "tailwindcss";
 
+/* ============================================================
+   LexaDeck — Swiss Typographic design language (Variant C)
+   Single family (Archivo), hard grid, flat functional color,
+   zero radius. Semantic tokens switch with [data-theme].
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* surfaces */
+  --c-bg: #fafaf6;
+  --c-surface: #fafaf6;
+  --c-ink: #16150f;
+  --c-muted: #74726a;
+  --c-line: #16150f; /* structural borders are ink */
+  --c-soft: #e4e2d8; /* soft internal dividers, meters */
+
+  /* flat functional accents */
+  --c-blue: #2b50e0;
+  --c-coral: #f4502e;
+  --c-green: #0e9d62;
+  --c-amber: #efa51e;
+  --c-teal: #0ba59a;
+  --c-purple: #8d4fe0;
+  --c-pink: #e23a8e;
+  --c-lavender: #8d87c9;
+}
+
+[data-theme="dark"] {
+  --c-bg: #161511;
+  --c-surface: #161511;
+  --c-ink: #f2f1ea;
+  --c-muted: #98948a;
+  --c-line: #f2f1ea;
+  --c-soft: #35332b;
+
+  --c-blue: #7d96ff;
+  --c-coral: #ff7352;
+  --c-green: #2ecf8b;
+  --c-amber: #ffc04d;
+  --c-teal: #2fd0c4;
+  --c-purple: #b88aff;
+  --c-pink: #ff6cb1;
+  --c-lavender: #aaa3ec;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-*: initial;
+
+  --color-bg: var(--c-bg);
+  --color-surface: var(--c-surface);
+  --color-ink: var(--c-ink);
+  --color-muted: var(--c-muted);
+  --color-line: var(--c-line);
+  --color-soft: var(--c-soft);
+
+  --color-blue: var(--c-blue);
+  --color-coral: var(--c-coral);
+  --color-green: var(--c-green);
+  --color-amber: var(--c-amber);
+  --color-teal: var(--c-teal);
+  --color-purple: var(--c-purple);
+  --color-pink: var(--c-pink);
+  --color-lavender: var(--c-lavender);
+
+  --color-white: #fff;
+  --color-black: #000;
+  --color-transparent: transparent;
+
+  --font-ui: var(--font-archivo), sans-serif;
+
+  /* the entire app is square */
+  --radius-*: initial;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-font-smoothing: antialiased;
+  background: var(--c-bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-family: var(--font-archivo), sans-serif;
+}
+
+/* ---- typographic roles ---------------------------------- */
+
+/* hero/display: oversized, heavy, wide, lowercase */
+.type-display {
+  font-variation-settings: "wdth" 122;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  text-transform: lowercase;
+}
+
+/* card terms and titles: heavy + wide at smaller sizes */
+.type-term {
+  font-variation-settings: "wdth" 120;
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  text-transform: lowercase;
+}
+
+/* structural caps label */
+.label-caps {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* tabular numerals everywhere numbers align */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 3D flip support for study cards --------------------- */
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+.perspective-1200 {
+  perspective: 1200px;
 }

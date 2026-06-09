@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; }
+  body { width: 100vw; height: 100vh; overflow: hidden; }
+  .tile {
+    width: 100vw; height: 100vh;
+    background: #FAFAF6;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .tile.maskable .mark { transform: scale(0.68); }
+  .mark {
+    font-family: "Archivo", sans-serif;
+    font-variation-settings: "wdth" 122;
+    font-weight: 900;
+    font-size: 62vw;
+    color: #16150F;
+    line-height: 0.9;
+    letter-spacing: -0.05em;
+    margin-top: -8vh;
+  }
+  .mark span { color: #F4502E; }
+  .rule {
+    position: absolute; left: 0; right: 0; top: 0; height: 7vh;
+    background: #16150F;
+  }
+  .tile.maskable .rule { display: none; }
+</style>
+</head>
+<body>
+  <div class="tile" id="tile">
+    <div class="rule"></div>
+    <div class="mark">lx<span>.</span></div>
+  </div>
+  <script>
+    if (location.hash === "#maskable") document.getElementById("tile").classList.add("maskable");
+  </script>
+</body>
+</html>
