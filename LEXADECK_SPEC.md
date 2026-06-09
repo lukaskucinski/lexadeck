@@ -1,7 +1,33 @@
-# LexaDeck — Technical Specification v0.1
+# LexaDeck — Technical Specification v0.2
 
-> A refined, colorful language studio with tactile flashcards, expressive typography,
-> atlas-like progress, and fast, elegant review interactions.
+> A Swiss-typographic language studio: hard grids, oversized Archivo type,
+> flat functional color, and fast, elegant review interactions.
+
+---
+
+## v0.2 Amendments (as built — supersede conflicting v0.1 sections below)
+
+| # | Area | v0.1 | v0.2 (implemented) |
+|---|---|---|---|
+| 13 | Design language | Parchment Editorial (§8) | **Swiss Typographic** (design-spike variant C): bg `#FAFAF6`, ink `#16150F`, single family **Archivo** (variable wdth), zero border radius, 1.5px ink borders, flat functional color squares. §8 color/typography tables are historical |
+| 14 | Hosting | Local SQLite | **Vercel + Supabase Postgres** (`kuoediscikartsdebdfo`, us-east-1) from day one |
+| 15 | Auth (v1) | None | Shared-password gate: Next 16 `proxy.ts` + SHA-256 cookie; `/unlock` page; `SITE_PASSWORD` env |
+| 16 | SRS | Hand-rolled SM-2 (§4) | **FSRS via `ts-fsrs` v5**, short-term scheduler on → "Again/Hard/Good" learning steps re-enter the live session (≤12 min window). §4 algorithm is historical |
+| 17 | Data model | SM-2 fields | Card carries ts-fsrs card shape: `due, stability, difficulty, elapsedDays, scheduledDays, learningSteps, reps, lapses, state, lastReview` + new `example`, `exampleEn`, `enrichedAt` |
+| 18 | API | REST routes (§5) | **Zero API routes** — RSC reads + Server Actions (`lib/actions/*`) |
+| 19 | ORM | Prisma + SQLite | **Prisma 7** + Postgres: `prisma.config.ts`, driver adapter `@prisma/adapter-pg`, generated client in `lib/generated/prisma` |
+| 20 | Styling | tailwind.config.ts tokens | **Tailwind v4** `@theme inline` in `globals.css`; theme switch via `[data-theme]` |
+| 21 | Import | In-app CSV wizard (§10 UI) | **One-off scripts**: `scripts/import-notion.ts` reads the export folder (CSV + 1,013 MD pages), joins user translations from MD `- Answer:` lines on (term, stage), merges exact dupes. Result: 995 cards, 801 user-translated, 172 grammar rules. Import wizard UI → v2 |
+| 22 | AI providers | Claude API (§7) | **DeepL API Free** (authoritative ES→EN translation) + **Gemini API Free** (`gemini-2.5-flash`; examples, emoji; v2: explanations, hints, cloze). `scripts/enrich.ts`, resumable, paced for free tiers. v2 adds `/api/flashcard/generate` + `language_ai_cache` per `ai_api_recommendation_for_language_flashcard_app.md` |
+| 23 | Forms | React Hook Form | Native forms + `useActionState` + zod in server actions (RHF dropped — unneeded) |
+| 24 | Session state | Zustand | Local component state in `StudySession` (Zustand dropped — unneeded) |
+| 25 | Fonts | Playfair/Inter/Lora | **Archivo only** (display via `.type-display`/`.type-term` utility classes) |
+| 26 | Backlog | — | All imported cards due immediately; 50-card session cap, ≤10 new interleaved |
+| 27 | Extras | — | PWA manifest + icons, Cmd/Ctrl+K command palette, GitHub-style heatmaps, segmented mastery meters (no rings — Swiss) |
+
+**Verification shipped:** 25 vitest unit tests (`lib/srs`, `lib/import/notion`) and a
+Playwright e2e smoke (`scripts/study-smoke.ts`) covering session start → 4 ratings →
+DB assertions (review rows, FSRS mutation, Again re-queue window).
 
 ---
 

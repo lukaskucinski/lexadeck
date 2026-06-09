@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# lexadeck.
 
-## Getting Started
+A Swiss-typographic Spanish flashcard studio. Next.js + Supabase Postgres + FSRS
+(`ts-fsrs`) scheduling, populated from a Notion export, enriched via DeepL + Gemini.
 
-First, run the development server:
+Full design + architecture: [LEXADECK_SPEC.md](./LEXADECK_SPEC.md)
+
+## Setup
 
 ```bash
+npm install                 # also runs prisma generate
+cp .env.example .env        # fill in values (see below)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env` values:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Var | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase pooled connection (port 6543, `?pgbouncer=true`) — URL-encode special chars in the password |
+| `DIRECT_URL` | Supabase session connection (port 5432) — used by `prisma db push` |
+| `SITE_PASSWORD` | Gate password; unset disables the gate (local dev) |
+| `DEEPL_API_KEY` | DeepL API Free — fills missing translations |
+| `GEMINI_API_KEY` | Gemini API Free — example sentences + emoji |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+```bash
+npm test                # vitest (srs + import parser units)
+npm run db:push         # sync prisma/schema.prisma to the database
+npm run import:notion -- --dir "<notion-export-folder>" [--deck Español] [--force]
+npm run enrich          # DeepL pass (translations) + Gemini pass (examples/emoji); resumable
+npx tsx scripts/study-smoke.ts   # Playwright e2e against localhost:3457
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Stack notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Prisma 7**: connection URLs live in `prisma.config.ts`, runtime client uses the
+  `@prisma/adapter-pg` driver adapter; generated client is gitignored (`lib/generated/`)
+- **No REST API** — Server Actions + RSC only
+- **Auth** — Next 16 `proxy.ts` convention; SHA-256 cookie vs `SITE_PASSWORD`
+- **Theme** — Tailwind v4 `@theme inline` tokens in `app/globals.css`, dark mode via `[data-theme]`

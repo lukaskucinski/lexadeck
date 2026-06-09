@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/layout/BottomNav";
+import { CommandPalette } from "@/components/layout/CommandPalette";
 import { NavRail } from "@/components/layout/NavRail";
 
 export default function MainLayout({
@@ -10,6 +11,7 @@ export default function MainLayout({
     <>
       <NavRail />
       <BottomNav />
+      <CommandPalette />
       <main className="min-h-screen px-5 pt-8 pb-24 md:pr-12 md:pb-12 md:pl-[7.5rem]">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>

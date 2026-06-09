@@ -93,7 +93,7 @@ export default async function DashboardPage() {
                 <Link
                   key={card.id}
                   href={`/decks/${card.deckId}/cards/${card.id}`}
-                  className="border-[1.5px] border-line px-3 py-1.5 text-[0.8rem] font-bold transition-colors hover:bg-ink hover:text-bg"
+                  className="max-w-60 truncate border-[1.5px] border-line px-3 py-1.5 text-[0.8rem] font-bold transition-colors hover:bg-ink hover:text-bg"
                 >
                   {card.emoji && <span className="mr-1.5">{card.emoji}</span>}
                   {card.term}
