@@ -14,7 +14,6 @@
     "enrich": "tsx scripts/enrich.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@hookform/resolvers": "^5.4.0",

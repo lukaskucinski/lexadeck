@@ -38,7 +38,8 @@ model Card {
   // enrichment
   notes       String?
   conjugation String?
-  example     String?
+  example     String? // example sentence in the target language
+  exampleEn   String? // English gloss of the example
   emoji       String?
   imageUrl    String?
   audioUrl    String?
