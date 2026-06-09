@@ -42,3 +42,7 @@ next-env.d.ts
 
 # transient visual-check screenshots
 design-spike/check-*.png
+!.env.example
+
+# prisma generated client
+lib/generated/

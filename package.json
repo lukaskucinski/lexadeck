@@ -6,13 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "import:notion": "tsx scripts/import-notion.ts",
+    "enrich": "tsx scripts/enrich.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@hookform/resolvers": "^5.4.0",
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
@@ -32,6 +38,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "^16.2.8",
     "prisma": "^7.8.0",
