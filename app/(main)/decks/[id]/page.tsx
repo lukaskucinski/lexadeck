@@ -1,0 +1,145 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Pencil } from "lucide-react";
+import { toCardRow } from "@/components/card/cardRow";
+import { CardListTable } from "@/components/card/CardListTable";
+import { FilterPanel } from "@/components/card/FilterPanel";
+import { FlashCardPreview } from "@/components/card/FlashCardPreview";
+import { Pagination } from "@/components/card/Pagination";
+import { SearchBar } from "@/components/card/SearchBar";
+import { KanbanBoard } from "@/components/deck/KanbanBoard";
+import { ViewToggle } from "@/components/deck/ViewToggle";
+import { ButtonLink } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { prisma } from "@/lib/db";
+import { buildCardWhere, cardOrderBy, parseCardViewParams } from "@/lib/queries";
+
+export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 60;
+
+const CARD_SELECT = {
+  id: true,
+  deckId: true,
+  term: true,
+  translation: true,
+  wordType: true,
+  gender: true,
+  cardType: true,
+  emoji: true,
+  due: true,
+  state: true,
+  stability: true,
+} as const;
+
+export default async function DeckDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const vp = parseCardViewParams(sp);
+  const now = new Date();
+
+  const deck = await prisma.deck.findUnique({ where: { id } });
+  if (!deck) notFound();
+
+  const where = { deckId: id, ...buildCardWhere(vp.filters, now) };
+  const [total, ready] = await Promise.all([
+    prisma.card.count({ where: { deckId: id } }),
+    prisma.card.count({ where: { deckId: id, due: { lte: now } } }),
+  ]);
+
+  let content: React.ReactNode;
+
+  if (vp.view === "kanban") {
+    const cards = await prisma.card.findMany({
+      where,
+      orderBy: [{ due: "asc" }, { term: "asc" }],
+      select: CARD_SELECT,
+    });
+    const rows = cards.map((c) => toCardRow(c, now));
+    content =
+      rows.length === 0 ? (
+        <EmptyState title="no cards match">Adjust filters or add a card.</EmptyState>
+      ) : (
+        <KanbanBoard cards={rows} deckId={id} />
+      );
+  } else {
+    const [cards, filteredTotal] = await Promise.all([
+      prisma.card.findMany({
+        where,
+        orderBy: cardOrderBy(vp.sort, vp.dir),
+        select: CARD_SELECT,
+        skip: (vp.page - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
+      }),
+      prisma.card.count({ where }),
+    ]);
+    const rows = cards.map((c) => toCardRow(c, now));
+
+    if (rows.length === 0) {
+      content = <EmptyState title="no cards match">Adjust filters or add a card.</EmptyState>;
+    } else if (vp.view === "list") {
+      content = (
+        <>
+          <CardListTable cards={rows} sort={vp.sort} dir={vp.dir} />
+          <Pagination page={vp.page} pageSize={PAGE_SIZE} total={filteredTotal} />
+        </>
+      );
+    } else {
+      content = (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {rows.map((card) => (
+              <FlashCardPreview key={card.id} card={card} />
+            ))}
+          </div>
+          <Pagination page={vp.page} pageSize={PAGE_SIZE} total={filteredTotal} />
+        </>
+      );
+    }
+  }
+
+  return (
+    <div>
+      <header className="mb-6 border-b-[3px] border-line pb-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="label-caps mb-1.5 flex items-center gap-3 text-muted">
+              <span style={{ color: `var(--c-${deck.accentColor ?? "coral"})` }}>
+                {deck.language}
+              </span>
+              <span className="tnum">{total.toLocaleString()} cards</span>
+              <span className="tnum text-coral">{ready.toLocaleString()} ready</span>
+              <Link href={`/decks/${id}/edit`} className="hover:text-ink" title="Edit deck">
+                <Pencil size={13} />
+              </Link>
+            </div>
+            <h1 className="type-display text-4xl md:text-5xl">{deck.name}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <ButtonLink href={`/decks/${id}/cards/new`} variant="outline">
+              + Card
+            </ButtonLink>
+            <ButtonLink href={`/decks/${id}/study`} variant="primary">
+              Study {ready > 0 ? `(${Math.min(ready, 50)})` : ""} →
+            </ButtonLink>
+          </div>
+        </div>
+      </header>
+
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <ViewToggle active={vp.view} />
+        <div className="flex items-center gap-3">
+          <SearchBar />
+          <FilterPanel />
+        </div>
+      </div>
+
+      {content}
+    </div>
+  );
+}

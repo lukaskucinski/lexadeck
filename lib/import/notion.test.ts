@@ -69,6 +69,26 @@ describe("parseMdFile", () => {
     });
   });
 
+  it("does not slurp the aside block after an empty Answer line", () => {
+    const md = `# El Año
+
+Last Review: April 3, 2023
+Stage: Nouns (Male)
+
+- Answer:
+
+    <aside>
+    💡
+
+    </aside>
+`;
+    expect(parseMdFile(md)).toEqual({
+      term: "El Año",
+      stage: "Nouns (Male)",
+      answer: null,
+    });
+  });
+
   it("handles accented terms with NFC-stable keys", () => {
     const md = `# Añadir\n\nStage: Verbs\n\n- Answer: To add\n`;
     const entry = parseMdFile(md)!;

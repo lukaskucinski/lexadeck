@@ -112,14 +112,15 @@ export interface MdEntry {
 export function parseMdFile(content: string): MdEntry | null {
   const text = stripBom(content);
 
-  const h1 = text.match(/^#\s+(.+)$/m);
+  // NOTE: [ \t] not \s — \s matches newlines and would slurp the next line
+  const h1 = text.match(/^#[ \t]+(.+)$/m);
   if (!h1) return null;
   const term = h1[1].trim();
 
-  const stageMatch = text.match(/^Stage:\s*(.+)$/m);
+  const stageMatch = text.match(/^Stage:[ \t]*(.+)$/m);
   const stage = stageMatch ? stageMatch[1].trim() : "";
 
-  const answerMatch = text.match(/^-\s+Answer:\s*(.*)$/m);
+  const answerMatch = text.match(/^-[ \t]+Answer:[ \t]*(.*)$/m);
   const answer = answerMatch ? answerMatch[1].trim() : "";
 
   return { term, stage, answer: answer.length > 0 ? answer : null };
