@@ -5,6 +5,7 @@ import { useState } from "react";
 import { WORD_TYPE_LABELS } from "@/lib/types";
 import type { StudyCard } from "@/lib/study";
 import { wordTypeVar } from "@/lib/wordTypeColors";
+import { SpeakButton } from "@/components/ui/SpeakButton";
 
 function termSizeClass(term: string): string {
   if (term.length <= 12) return "text-5xl md:text-6xl";
@@ -67,7 +68,10 @@ export function FlashCard({
           </div>
 
           <div className="flex flex-1 flex-col items-start justify-center gap-6 px-7 py-8">
-            <h2 className={`type-display ${termSizeClass(prompt)}`}>{prompt}</h2>
+            <h2 className={`type-display ${termSizeClass(prompt)}`}>
+              {prompt}
+              <SpeakButton text={prompt} lang={promptLang} size={22} className="ml-3 align-middle" />
+            </h2>
             <span className="label-caps text-muted">Space to reveal ↓</span>
           </div>
 
@@ -100,7 +104,15 @@ export function FlashCard({
             {/* grammar cards legitimately have no translation — only word
                 cards show the missing-translation placeholder */}
             {reversed ? (
-              <p className="type-term text-3xl tracking-tight md:text-4xl">{card.term}</p>
+              <p className="type-term text-3xl tracking-tight md:text-4xl">
+                {card.term}
+                <SpeakButton
+                  text={card.term}
+                  lang={card.language}
+                  size={20}
+                  className="ml-3 align-middle"
+                />
+              </p>
             ) : (
               (card.translation || !isGrammar) && (
                 <p className="text-3xl font-medium tracking-tight md:text-4xl">
@@ -111,7 +123,16 @@ export function FlashCard({
 
             {(card.example || card.exampleEn) && (
               <div className="mt-6 border-l-2 border-line pl-4">
-                {card.example && <p className="font-medium">{card.example}</p>}
+                {card.example && (
+                  <p className="font-medium">
+                    {card.example}
+                    <SpeakButton
+                      text={card.example}
+                      lang={card.language}
+                      className="ml-2 align-text-bottom"
+                    />
+                  </p>
+                )}
                 {card.exampleEn && <p className="mt-1 text-sm text-muted">{card.exampleEn}</p>}
               </div>
             )}

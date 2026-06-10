@@ -17,7 +17,7 @@ export function Select({
     <span className={`relative block ${className}`}>
       <select
         disabled={disabled}
-        className="h-10 w-full cursor-pointer appearance-none border-[1.5px] border-line bg-bg pr-8 pl-3 text-sm font-bold tracking-wide uppercase outline-none transition-colors hover:bg-soft/60 focus-visible:border-ink disabled:cursor-not-allowed disabled:border-soft disabled:bg-transparent disabled:text-muted/50"
+        className="h-10 w-full cursor-pointer appearance-none border-[1.5px] border-line bg-bg pr-8 pl-3 text-[0.8rem] font-extrabold tracking-[0.08em] uppercase outline-none transition-colors hover:bg-soft/60 focus:border-ink disabled:cursor-not-allowed disabled:border-soft disabled:bg-transparent disabled:text-muted/50"
         {...props}
       >
         {children}

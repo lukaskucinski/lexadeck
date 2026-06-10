@@ -4,6 +4,7 @@ import { CardStatusActions } from "@/components/card/CardStatusActions";
 import { EnrichButton } from "@/components/card/EnrichButton";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
+import { SpeakButton } from "@/components/ui/SpeakButton";
 import { prisma } from "@/lib/db";
 import { getSRSState } from "@/lib/srs";
 import type { Gender, WordType } from "@/lib/types";
@@ -53,6 +54,7 @@ export default async function CardDetailPage({
         <div className="px-6 py-7">
           <h1 className="type-display text-5xl md:text-6xl">
             {card.term}
+            <SpeakButton text={card.term} lang={card.language} size={26} className="ml-4 align-middle" />
             {card.emoji && <span className="ml-4 align-middle text-4xl">{card.emoji}</span>}
           </h1>
           <p className="mt-4 text-2xl font-medium tracking-tight">
@@ -62,7 +64,12 @@ export default async function CardDetailPage({
 
         {(card.example || card.exampleEn) && (
           <div className="mx-6 mb-6 border-l-2 border-line pl-4">
-            {card.example && <p className="font-medium">{card.example}</p>}
+            {card.example && (
+              <p className="font-medium">
+                {card.example}
+                <SpeakButton text={card.example} lang={card.language} className="ml-2 align-text-bottom" />
+              </p>
+            )}
             {card.exampleEn && <p className="mt-1 text-sm text-muted">{card.exampleEn}</p>}
           </div>
         )}

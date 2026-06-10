@@ -7,6 +7,9 @@
    ============================================================ */
 
 :root {
+  /* makes native widgets (select popups, scrollbars) render on-theme */
+  color-scheme: light;
+
   /* surfaces */
   --c-bg: #fafaf6;
   --c-surface: #fafaf6;
@@ -27,6 +30,8 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --c-bg: #161511;
   --c-surface: #161511;
   --c-ink: #f2f1ea;
@@ -114,6 +119,14 @@ body {
 /* tabular numerals everywhere numbers align */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* native <select> popup lists: on-theme surfaces where the browser allows
+   (Chromium honors these; elsewhere color-scheme keeps the palette right) */
+select option {
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-weight: 600;
 }
 
 /* ---- 3D flip support for study cards --------------------- */
