@@ -55,6 +55,14 @@ Supabase MCP must be authenticated against that account, not OSIT).
 - **Windows orphan servers**: stopped background `next start` tasks can leave the
   port held. Free it: find PID via `netstat -ano | grep :3457`, then `taskkill //F //PID`.
 
+## Development Principles (Pragmatic Programmer)
+- **TDD**: new behavior and bug fixes start with a failing vitest unit test
+  (red → green → refactor). Reproduce a bug in a test before fixing it.
+- **Modularity**: keep logic pure and in `lib/` so it's testable without DB or UI
+  (e.g. `lib/filters.ts`, `lib/study.ts`); components and server actions stay thin.
+- **Tracer bullets**: ship a thin end-to-end slice first (schema → lib → action →
+  UI → smoke test), then flesh it out — don't build layers in isolation.
+
 ## Testing
 - `npm test` — vitest units for `lib/srs.ts` and `lib/import/notion.ts`.
 - `npx tsx scripts/study-smoke.ts` — Playwright e2e (needs gate-disabled server

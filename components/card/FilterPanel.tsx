@@ -2,6 +2,7 @@
 
 import { SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { selectedSet, toggleValue } from "@/lib/filters";
 import {
   CardType,
   Gender,
@@ -16,30 +17,6 @@ import { useViewParams } from "./useViewParams";
 interface DeckOption {
   id: string;
   name: string;
-}
-
-/**
- * Facet semantics: no URL param = every option checked (everything shows by
- * default); a CSV param = only those options checked; "none" = all unchecked
- * (matches nothing). The param disappears again when every box is re-checked.
- */
-function selectedSet(current: string | null, all: readonly string[]): Set<string> {
-  if (current == null) return new Set(all);
-  if (current === "none") return new Set();
-  return new Set(current.split(",").filter(Boolean));
-}
-
-function toggleValue(
-  current: string | null,
-  value: string,
-  all: readonly string[],
-): string | null {
-  const selected = selectedSet(current, all);
-  if (selected.has(value)) selected.delete(value);
-  else selected.add(value);
-  if (selected.size === 0) return "none";
-  if (all.every((v) => selected.has(v))) return null;
-  return all.filter((v) => selected.has(v)).join(",");
 }
 
 function CheckRow({
