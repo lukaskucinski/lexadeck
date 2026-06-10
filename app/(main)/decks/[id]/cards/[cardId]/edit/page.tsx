@@ -20,7 +20,12 @@ export default async function EditCardPage({
   return (
     <div>
       <PageHeader title={`edit ${card.term.toLowerCase()}`} />
-      <CardForm action={updateAction} initial={card} submitLabel="Save changes" />
+      <CardForm
+        action={updateAction}
+        initial={card}
+        submitLabel="Save changes"
+        cancelHref={`/decks/${id}/cards/${cardId}`}
+      />
 
       <div className="mt-12 max-w-2xl border-t-[1.5px] border-line pt-6">
         <p className="label-caps mb-3 text-muted">Danger zone</p>

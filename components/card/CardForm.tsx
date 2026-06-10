@@ -9,7 +9,7 @@ import {
   WordType,
 } from "@/lib/types";
 import { wordTypeVar } from "@/lib/wordTypeColors";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
 export interface CardFormValues {
@@ -50,11 +50,13 @@ export function CardForm({
   initial = {},
   submitLabel,
   allowAddAnother = false,
+  cancelHref,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   initial?: CardFormValues;
   submitLabel: string;
   allowAddAnother?: boolean;
+  cancelHref?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const [wordType, setWordType] = useState(initial.wordType ?? "NOUN");
@@ -201,6 +203,11 @@ export function CardForm({
           <Button type="submit" name="addAnother" value="true" variant="outline" disabled={pending}>
             Save + add another
           </Button>
+        )}
+        {cancelHref && (
+          <ButtonLink href={cancelHref} variant="ghost">
+            Cancel
+          </ButtonLink>
         )}
       </div>
     </form>

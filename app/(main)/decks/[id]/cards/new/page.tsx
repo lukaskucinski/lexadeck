@@ -27,6 +27,7 @@ export default async function NewCardPage({
         initial={{ wordType }}
         submitLabel="Create card"
         allowAddAnother
+        cancelHref={`/decks/${deck.id}`}
       />
     </div>
   );
