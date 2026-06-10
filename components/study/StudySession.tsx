@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { endSession, startSession, submitReview } from "@/lib/actions/study";
 import { formatDueIn, previewIntervals, Rating, type Grade } from "@/lib/srs";
 import { REQUEUE_WINDOW_MS, type StudyCard } from "@/lib/study";
@@ -40,21 +40,48 @@ const WASH_COLOR: Record<Grade, string> = {
   [Rating.Easy]: "var(--c-green)",
 };
 
+/** "forward" = term first (es→en) · "reverse" = translation first (en→es) */
+type Direction = "forward" | "reverse";
+const DIRECTION_KEY = "lexadeck-study-direction";
+
+// localStorage-backed external store (same pattern as ThemeToggle)
+let directionListeners: (() => void)[] = [];
+function subscribeDirection(listener: () => void) {
+  directionListeners.push(listener);
+  return () => {
+    directionListeners = directionListeners.filter((l) => l !== listener);
+  };
+}
+function getDirectionSnapshot(): Direction {
+  return localStorage.getItem(DIRECTION_KEY) === "reverse" ? "reverse" : "forward";
+}
+function setStoredDirection(dir: Direction) {
+  localStorage.setItem(DIRECTION_KEY, dir);
+  for (const listener of directionListeners) listener();
+}
+
 export function StudySession({
   deckId,
   deckName,
+  language = "es",
   cards,
   dueCount,
   newCount,
 }: {
   deckId: string;
   deckName: string;
+  language?: string;
   cards: StudyCard[];
   dueCount: number;
   newCount: number;
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<"preview" | "active" | "done">("preview");
+  const direction = useSyncExternalStore(
+    subscribeDirection,
+    getDirectionSnapshot,
+    () => "forward" as Direction,
+  );
   const [queue, setQueue] = useState<QueueItem[]>(() =>
     cards.map((card) => ({ card, dueAt: 0, pass: 0 })),
   );
@@ -173,6 +200,29 @@ export function StudySession({
             Sessions are capped at 50 cards · keys: space reveals, 1–4 rate
           </div>
         </div>
+
+        {/* study direction — shared FSRS schedule either way */}
+        <div className="mt-4 flex w-full border-[1.5px] border-line">
+          {(
+            [
+              ["forward", `${language} → en`],
+              ["reverse", `en → ${language}`],
+            ] as const
+          ).map(([dir, label], i) => (
+            <button
+              key={dir}
+              onClick={() => setStoredDirection(dir)}
+              className={`h-10 flex-1 text-[0.72rem] font-extrabold tracking-[0.1em] uppercase transition-colors ${
+                i > 0 ? "border-l border-line" : ""
+              } ${direction === dir ? "bg-ink text-bg" : "text-muted hover:bg-soft"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[0.7rem] font-semibold text-muted">
+          Cards without a translation always show {language} first.
+        </p>
 
         <div className="mt-6 flex gap-3">
           <Button onClick={begin} disabled={cards.length === 0}>
@@ -300,6 +350,7 @@ export function StudySession({
             >
               <FlashCard
                 card={current.card}
+                reversed={direction === "reverse" && current.card.translation != null}
                 revealed={revealed}
                 onReveal={() => setRevealed(true)}
               />

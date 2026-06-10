@@ -142,6 +142,7 @@ export default async function StudyPage({
       key={sessionKey}
       deckId={id}
       deckName={deck.name}
+      language={deck.language}
       cards={queue}
       dueCount={due.length}
       newCount={fresh.length}
