@@ -22,14 +22,21 @@ const GENDER_LABEL: Record<string, string> = {
 export function FlashCard({
   card,
   revealed,
+  reversed = false,
   onReveal,
 }: {
   card: StudyCard;
   revealed: boolean;
+  /** en→es mode: prompt with the translation, answer with the term */
+  reversed?: boolean;
   onReveal: () => void;
 }) {
-  const [notesOpen, setNotesOpen] = useState(false);
+  const isGrammar = card.cardType === "GRAMMAR";
+  // grammar cards carry their substance in notes — surface them immediately
+  const [notesOpen, setNotesOpen] = useState(isGrammar);
   const accent = wordTypeVar(card.wordType);
+  const prompt = reversed ? card.translation! : card.term;
+  const promptLang = reversed ? "en" : card.language;
 
   return (
     <div className="perspective-1200 w-full">
@@ -51,25 +58,25 @@ export function FlashCard({
                 <em className="ml-1.5 text-muted not-italic">{GENDER_LABEL[card.gender]}</em>
               )}
             </span>
-            <span className="label-caps ml-auto text-muted">{card.language}</span>
+            <span className="label-caps ml-auto text-muted">{promptLang}</span>
             {card.isNew && (
-              <span className="bg-blue px-1.5 py-0.5 text-[0.58rem] font-extrabold tracking-[0.1em] text-white uppercase">
+              <span className="bg-blue px-1.5 py-0.5 text-[0.58rem] font-extrabold tracking-[0.1em] text-bg uppercase">
                 New
               </span>
             )}
           </div>
 
           <div className="flex flex-1 flex-col items-start justify-center gap-6 px-7 py-8">
-            <h2 className={`type-display ${termSizeClass(card.term)}`}>{card.term}</h2>
+            <h2 className={`type-display ${termSizeClass(prompt)}`}>{prompt}</h2>
             <span className="label-caps text-muted">Space to reveal ↓</span>
           </div>
 
           <div className="grid grid-cols-2 border-t border-line text-[0.62rem] font-semibold tracking-[0.1em] text-muted uppercase">
             <div className="tnum border-r border-soft px-5 py-2.5">
-              <b className="text-ink">{card.reps}</b> reviews
+              <b className="text-ink">{card.srs.reps}</b> reviews
             </div>
             <div className="tnum px-5 py-2.5">
-              <b className="text-ink">{card.stability.toFixed(1)}d</b> stability
+              <b className="text-ink">{card.srs.stability.toFixed(1)}d</b> stability
             </div>
           </div>
         </div>
@@ -81,7 +88,7 @@ export function FlashCard({
         >
           <div className="flex items-center gap-3 border-b border-line px-5 py-3">
             <i className="h-3 w-3" style={{ background: accent }} />
-            <span className="type-term text-lg leading-none">{card.term}</span>
+            <span className="type-term text-lg leading-none">{prompt}</span>
             {card.emoji && <span className="text-lg leading-none">{card.emoji}</span>}
             <span className="label-caps ml-auto text-muted">
               {WORD_TYPE_LABELS[card.wordType]}
@@ -90,9 +97,17 @@ export function FlashCard({
           </div>
 
           <div className="flex-1 px-7 py-6">
-            <p className="text-3xl font-medium tracking-tight md:text-4xl">
-              {card.translation ?? <span className="text-muted/60">no translation yet</span>}
-            </p>
+            {/* grammar cards legitimately have no translation — only word
+                cards show the missing-translation placeholder */}
+            {reversed ? (
+              <p className="type-term text-3xl tracking-tight md:text-4xl">{card.term}</p>
+            ) : (
+              (card.translation || !isGrammar) && (
+                <p className="text-3xl font-medium tracking-tight md:text-4xl">
+                  {card.translation ?? <span className="text-muted/60">no translation yet</span>}
+                </p>
+              )
+            )}
 
             {(card.example || card.exampleEn) && (
               <div className="mt-6 border-l-2 border-line pl-4">

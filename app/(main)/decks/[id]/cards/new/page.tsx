@@ -21,7 +21,7 @@ export default async function NewCardPage({
 
   return (
     <div>
-      <PageHeader index="02·A" title={`new card · ${deck.name.toLowerCase()}`} />
+      <PageHeader title={`new card · ${deck.name.toLowerCase()}`} />
       <CardForm
         action={action}
         initial={{ wordType }}

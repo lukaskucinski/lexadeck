@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useTransition } from "react";
 import { deleteCards, updateCardInline } from "@/lib/actions/cards";
+import { CardActionsMenu } from "./CardActionsMenu";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { Button } from "@/components/ui/Button";
@@ -115,6 +116,7 @@ export function CardListTable({
   dir: "asc" | "desc";
   showDeck?: boolean;
 }) {
+  const router = useRouter();
   const { setParams } = useViewParams();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -180,8 +182,13 @@ export function CardListTable({
         </thead>
         <tbody>
           {cards.map((card) => (
-            <tr key={card.id} className="border-b border-soft last:border-b-0 hover:bg-soft/25">
-              <td className="px-3 py-2">
+            <tr
+              key={card.id}
+              onClick={() => router.push(`/decks/${card.deckId}/cards/${card.id}`)}
+              className="cursor-pointer border-b border-soft last:border-b-0 hover:bg-soft/25"
+            >
+              {/* interactive cells swallow the row click */}
+              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
                   checked={selected.has(card.id)}
@@ -189,10 +196,10 @@ export function CardListTable({
                   className="accent-[var(--c-ink)]"
                 />
               </td>
-              <td className="px-3 py-2 font-bold">
+              <td className="px-3 py-2 font-bold" onClick={(e) => e.stopPropagation()}>
                 <EditableCell cardId={card.id} field="term" value={card.term} />
               </td>
-              <td className="px-3 py-2 text-muted">
+              <td className="px-3 py-2 text-muted" onClick={(e) => e.stopPropagation()}>
                 <EditableCell cardId={card.id} field="translation" value={card.translation} />
               </td>
               {showDeck && (
@@ -221,14 +228,8 @@ export function CardListTable({
               <td className="tnum px-3 py-2 text-[0.78rem] font-semibold text-muted">
                 {dueLabel(card.due)}
               </td>
-              <td className="px-3 py-2">
-                <Link
-                  href={`/decks/${card.deckId}/cards/${card.id}`}
-                  className="text-muted hover:text-ink"
-                  title="Open card"
-                >
-                  <ArrowUpRight size={16} />
-                </Link>
+              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <CardActionsMenu cardId={card.id} deckId={card.deckId} srs={card.srs} />
               </td>
             </tr>
           ))}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { rateCard, type Grade } from "@/lib/srs";
+import { rateCard, type Grade, type SchedulerFields } from "@/lib/srs";
 
 export async function startSession(deckId: string): Promise<string> {
   const session = await prisma.session.create({ data: { deckId } });
@@ -13,6 +13,8 @@ export interface ReviewOutcome {
   /** ms until this card is due again; the client re-queues short waits. */
   dueInMs: number;
   state: number;
+  /** Updated FSRS state, so re-queued cards preview accurate intervals. */
+  fields: SchedulerFields;
 }
 
 export async function submitReview(
@@ -42,7 +44,7 @@ export async function submitReview(
     }),
   ]);
 
-  return { dueInMs: fields.due.getTime() - now.getTime(), state: fields.state };
+  return { dueInMs: fields.due.getTime() - now.getTime(), state: fields.state, fields };
 }
 
 export async function endSession(sessionId: string, cardCount: number): Promise<void> {

@@ -108,11 +108,45 @@ export function rateCard(
   };
 }
 
+/** ms until due for each rating, so the UI can show what each button does. */
+export function previewIntervals(
+  fields: SchedulerFields,
+  now: Date = new Date(),
+): Record<Grade, number> {
+  const preview = scheduler.repeat(toFsrsCard(fields), now);
+  const dueIn = (grade: Grade) => preview[grade].card.due.getTime() - now.getTime();
+  return {
+    [Rating.Again]: dueIn(Rating.Again),
+    [Rating.Hard]: dueIn(Rating.Hard),
+    [Rating.Good]: dueIn(Rating.Good),
+    [Rating.Easy]: dueIn(Rating.Easy),
+  };
+}
+
+/** Compact "due in" label: <1m, 8m, 3h, 12d, 4mo, 1.5y. */
+export function formatDueIn(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "<1m";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  if (days < 31) return `${days}d`;
+  const months = Math.round(days / 30.44);
+  if (months < 12) return `${months}mo`;
+  const years = ms / (365.25 * 86_400_000);
+  return `${Math.round(years * 10) / 10}y`;
+}
+
 /** Display-level state used for badges, filters and stats. */
 export function getSRSState(
-  fields: Pick<SchedulerFields, "state" | "due" | "stability">,
+  fields: Pick<SchedulerFields, "state" | "due" | "stability"> & {
+    /** manual override — set via "Mark mastered" */
+    masteredAt?: Date | null;
+  },
   now: Date = new Date(),
 ): SRSState {
+  if (fields.masteredAt) return "mastered";
   switch (fields.state) {
     case State.New:
       return "new";

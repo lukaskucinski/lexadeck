@@ -33,7 +33,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* text/plain on the client: the script only matters during HTML
+            parsing; this silences React's dev warning when the tree
+            client-renders (per next docs: preventing-flash-before-hydration) */}
+        <script
+          type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
       </head>
       <body className="min-h-full">{children}</body>
     </html>

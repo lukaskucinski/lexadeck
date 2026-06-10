@@ -90,7 +90,7 @@ export function CommandPalette() {
       onClick={close}
     >
       <div
-        className="w-full max-w-lg border-[1.5px] border-line bg-bg shadow-[8px_8px_0_0_rgba(0,0,0,0.25)]"
+        className="w-full max-w-lg border-[1.5px] border-line bg-bg shadow-[8px_8px_0_0_var(--c-soft)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-line px-4">

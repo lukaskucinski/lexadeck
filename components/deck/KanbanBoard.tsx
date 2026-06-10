@@ -12,11 +12,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import Link from "next/link";
-import { Plus } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { setCardWordType } from "@/lib/actions/cards";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
+import { CardActionsMenu } from "@/components/card/CardActionsMenu";
 import type { CardRow } from "@/components/card/cardRow";
 
 const COLUMN_ORDER: WordType[] = [
@@ -35,7 +37,15 @@ const COLUMN_ORDER: WordType[] = [
 
 const PAGE = 50;
 
-function KanbanCard({ card, overlay = false }: { card: CardRow; overlay?: boolean }) {
+function KanbanCard({
+  card,
+  overlay = false,
+  onOpen,
+}: {
+  card: CardRow;
+  overlay?: boolean;
+  onOpen?: (card: CardRow) => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.id,
     data: { card },
@@ -45,9 +55,10 @@ function KanbanCard({ card, overlay = false }: { card: CardRow; overlay?: boolea
     <div
       ref={overlay ? undefined : setNodeRef}
       {...(overlay ? {} : { ...attributes, ...listeners })}
-      className={`flex items-center justify-between gap-2 border-b border-soft bg-bg px-3.5 py-2.5 last:border-b-0 ${
+      onClick={() => onOpen?.(card)}
+      className={`group flex items-center justify-between gap-2 border-b border-soft bg-bg px-3.5 py-2.5 last:border-b-0 ${
         isDragging && !overlay ? "opacity-30" : ""
-      } ${overlay ? "border-[1.5px] border-line shadow-[4px_4px_0_0_var(--c-soft)]" : "cursor-grab"}`}
+      } ${overlay ? "border-[1.5px] border-line shadow-[4px_4px_0_0_var(--c-soft)]" : "cursor-pointer hover:bg-soft/40"}`}
     >
       <div className="min-w-0">
         <Link
@@ -62,11 +73,21 @@ function KanbanCard({ card, overlay = false }: { card: CardRow; overlay?: boolea
           {card.translation ?? "—"}
         </div>
       </div>
-      <i
-        title={SRS_STATE_LABELS[card.srs]}
-        className="h-2 w-2 shrink-0"
-        style={{ background: srsStateVar(card.srs) }}
-      />
+      <div className="flex shrink-0 items-center gap-1.5">
+        {!overlay && (
+          <CardActionsMenu
+            cardId={card.id}
+            deckId={card.deckId}
+            srs={card.srs}
+            className="md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-within:opacity-100"
+          />
+        )}
+        <i
+          title={SRS_STATE_LABELS[card.srs]}
+          className="h-2 w-2 shrink-0"
+          style={{ background: srsStateVar(card.srs) }}
+        />
+      </div>
     </div>
   );
 }
@@ -75,16 +96,18 @@ function KanbanColumn({
   wordType,
   cards,
   deckId,
+  onOpen,
 }: {
   wordType: WordType;
   cards: CardRow[];
   deckId: string;
+  onOpen: (card: CardRow) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: wordType });
   const [visible, setVisible] = useState(PAGE);
 
   return (
-    <div className="flex w-[290px] shrink-0 flex-col">
+    <div className="flex w-[240px] shrink-0 snap-start flex-col md:w-[264px] xl:w-[290px]">
       <div
         className="flex items-center gap-2.5 border-b-2 px-1 pb-2"
         style={{ borderColor: wordTypeVar(wordType) }}
@@ -108,7 +131,7 @@ function KanbanColumn({
         }`}
       >
         {cards.slice(0, visible).map((card) => (
-          <KanbanCard key={card.id} card={card} />
+          <KanbanCard key={card.id} card={card} onOpen={onOpen} />
         ))}
         {cards.length === 0 && (
           <div className="px-3.5 py-6 text-center text-[0.74rem] font-semibold text-muted">
@@ -130,10 +153,15 @@ function KanbanColumn({
 }
 
 export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[]; deckId: string }) {
+  const router = useRouter();
   const [cards, setCards] = useState(initialCards);
   const [prevInitial, setPrevInitial] = useState(initialCards);
   const [active, setActive] = useState<CardRow | null>(null);
   const [, startTransition] = useTransition();
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+  // the click that follows a drop must not open the card
+  const justDragged = useRef(false);
 
   // derived-state sync when the server re-renders with fresh data
   if (prevInitial !== initialCards) {
@@ -144,6 +172,33 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
+
+  const updateOverflow = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setOverflow({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    });
+  }, []);
+
+  useEffect(() => {
+    updateOverflow();
+    window.addEventListener("resize", updateOverflow);
+    return () => window.removeEventListener("resize", updateOverflow);
+  }, [updateOverflow]);
+
+  const openCard = useCallback(
+    (card: CardRow) => {
+      if (justDragged.current) return;
+      router.push(`/decks/${card.deckId}/cards/${card.id}`);
+    },
+    [router],
+  );
+
+  function nudge(dir: 1 | -1) {
+    scrollerRef.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
+  }
 
   const columns = useMemo(() => {
     const grouped = new Map<WordType, CardRow[]>();
@@ -164,6 +219,8 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
 
   function onDragEnd(event: DragEndEvent) {
     setActive(null);
+    justDragged.current = true;
+    setTimeout(() => (justDragged.current = false), 50);
     const card = event.active.data.current?.card as CardRow | undefined;
     const target = event.over?.id as WordType | undefined;
     if (!card || !target || card.wordType === target) return;
@@ -180,15 +237,48 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="flex gap-5 overflow-x-auto pb-4">
-        {columns.map(({ wordType, cards: columnCards }) => (
-          <KanbanColumn
-            key={wordType}
-            wordType={wordType}
-            cards={columnCards}
-            deckId={deckId}
-          />
-        ))}
+      <div className="relative">
+        <div
+          ref={scrollerRef}
+          onScroll={updateOverflow}
+          className="flex snap-x snap-proximity gap-5 overflow-x-auto pb-4"
+        >
+          {columns.map(({ wordType, cards: columnCards }) => (
+            <KanbanColumn
+              key={wordType}
+              wordType={wordType}
+              cards={columnCards}
+              deckId={deckId}
+              onOpen={openCard}
+            />
+          ))}
+        </div>
+
+        {/* overflow affordances: edge fades + desktop scroll buttons */}
+        {overflow.left && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg to-transparent" />
+            <button
+              onClick={() => nudge(-1)}
+              aria-label="Scroll columns left"
+              className="absolute top-1/2 left-0 hidden h-9 w-9 -translate-y-1/2 items-center justify-center border-[1.5px] border-line bg-bg text-muted transition-colors hover:bg-ink hover:text-bg md:flex"
+            >
+              <ChevronLeft size={17} />
+            </button>
+          </>
+        )}
+        {overflow.right && (
+          <>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent" />
+            <button
+              onClick={() => nudge(1)}
+              aria-label="Scroll columns right"
+              className="absolute top-1/2 right-0 hidden h-9 w-9 -translate-y-1/2 items-center justify-center border-[1.5px] border-line bg-bg text-muted transition-colors hover:bg-ink hover:text-bg md:flex"
+            >
+              <ChevronRight size={17} />
+            </button>
+          </>
+        )}
       </div>
       <DragOverlay>{active && <KanbanCard card={active} overlay />}</DragOverlay>
     </DndContext>

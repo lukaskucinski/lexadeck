@@ -8,6 +8,7 @@ import {
   Layers,
   LibraryBig,
   Plus,
+  Settings,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -31,8 +32,9 @@ export function NavRail() {
         href="/"
         className="type-term mb-7 text-[1.45rem] text-ink"
         title="LexaDeck"
+        aria-label="LexaDeck home"
       >
-        l<span className="text-coral">.</span>
+        lx<span className="text-coral">.</span>
       </Link>
 
       <div className="flex flex-col items-center gap-1.5">
@@ -64,6 +66,17 @@ export function NavRail() {
       </Link>
 
       <div className="mt-auto flex flex-col items-center gap-1.5">
+        <Link
+          href="/settings"
+          title="Settings"
+          className={`flex h-10 w-10 items-center justify-center transition-colors ${
+            isActive(pathname, "/settings")
+              ? "bg-ink text-bg"
+              : "text-muted hover:bg-soft hover:text-ink"
+          }`}
+        >
+          <Settings size={19} />
+        </Link>
         <ThemeToggle />
       </div>
     </nav>

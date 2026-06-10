@@ -10,6 +10,7 @@ import {
 } from "@/lib/types";
 import { wordTypeVar } from "@/lib/wordTypeColors";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 export interface CardFormValues {
   term?: string;
@@ -106,29 +107,29 @@ export function CardForm({
 
         <div className="grid grid-cols-1 sm:grid-cols-3">
           <Field label="Word type" className="sm:border-r">
-            <div className="mt-1.5 flex items-center gap-2.5">
+            <div className="mt-2 flex items-center gap-2.5">
               <i className="h-3 w-3 shrink-0" style={{ background: wordTypeVar(wordType as WordType) }} />
-              <select
+              <Select
                 name="wordType"
                 value={wordType}
                 onChange={(e) => setWordType(e.target.value)}
-                className="w-full bg-transparent text-sm font-bold uppercase tracking-wide outline-none"
+                className="w-full"
               >
                 {Object.values(WordType).map((wt) => (
                   <option key={wt} value={wt}>
                     {WORD_TYPE_LABELS[wt]}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </Field>
 
           <Field label="Gender" className="sm:border-r">
-            <select
+            <Select
               name="gender"
               defaultValue={initial.gender ?? ""}
               disabled={wordType !== "NOUN"}
-              className="mt-1.5 w-full bg-transparent text-sm font-bold uppercase tracking-wide outline-none disabled:text-muted/50"
+              className="mt-2"
             >
               <option value="">—</option>
               {Object.values(Gender).map((g) => (
@@ -136,21 +137,17 @@ export function CardForm({
                   {g.toLowerCase()}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           <Field label="Card type">
-            <select
-              name="cardType"
-              defaultValue={initial.cardType ?? "VOCAB"}
-              className="mt-1.5 w-full bg-transparent text-sm font-bold uppercase tracking-wide outline-none"
-            >
+            <Select name="cardType" defaultValue={initial.cardType ?? "VOCAB"} className="mt-2">
               {Object.values(CardType).map((ct) => (
                 <option key={ct} value={ct}>
                   {ct.toLowerCase()}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
 

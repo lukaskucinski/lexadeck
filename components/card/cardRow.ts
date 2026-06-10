@@ -28,6 +28,7 @@ interface CardLike {
   due: Date;
   state: number;
   stability: number;
+  masteredAt?: Date | null;
 }
 
 export function toCardRow(card: CardLike, now: Date, deckName?: string): CardRow {

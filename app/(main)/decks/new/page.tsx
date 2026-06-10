@@ -5,7 +5,7 @@ import { createDeck } from "@/lib/actions/decks";
 export default function NewDeckPage() {
   return (
     <div>
-      <PageHeader index="01·A" title="new deck" />
+      <PageHeader title="new deck" />
       <DeckForm action={createDeck} submitLabel="Create deck" />
     </div>
   );

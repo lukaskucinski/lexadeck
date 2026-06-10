@@ -38,7 +38,7 @@ export default async function ProgressPage() {
 
   return (
     <div>
-      <PageHeader index="04" title="progress" />
+      <PageHeader title="progress" />
 
       {/* headline stats */}
       <div className="grid grid-cols-2 border-[1.5px] border-line sm:grid-cols-4">
