@@ -11,7 +11,7 @@ export default async function DecksPage() {
 
   return (
     <div>
-      <PageHeader index="01" title="decks">
+      <PageHeader title="decks">
         <ButtonLink href="/decks/new" variant="outline">
           + New deck
         </ButtonLink>

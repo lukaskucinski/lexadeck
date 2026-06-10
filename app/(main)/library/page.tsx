@@ -38,7 +38,7 @@ export default async function LibraryPage({
 
   return (
     <div>
-      <PageHeader index="03" title="library">
+      <PageHeader title="library">
         <SearchBar />
         <FilterPanel decks={decks} />
       </PageHeader>

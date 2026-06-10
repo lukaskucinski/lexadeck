@@ -22,7 +22,7 @@ export default async function EditDeckPage({
 
   return (
     <div>
-      <PageHeader index="01·B" title={`edit ${deck.name.toLowerCase()}`} />
+      <PageHeader title={`edit ${deck.name.toLowerCase()}`} />
       <DeckForm action={updateAction} initial={deck} submitLabel="Save changes" />
 
       <div className="mt-12 max-w-xl border-t-[1.5px] border-line pt-6">

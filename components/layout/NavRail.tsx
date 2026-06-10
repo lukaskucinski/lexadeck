@@ -31,8 +31,9 @@ export function NavRail() {
         href="/"
         className="type-term mb-7 text-[1.45rem] text-ink"
         title="LexaDeck"
+        aria-label="LexaDeck home"
       >
-        l<span className="text-coral">.</span>
+        lx<span className="text-coral">.</span>
       </Link>
 
       <div className="flex flex-col items-center gap-1.5">

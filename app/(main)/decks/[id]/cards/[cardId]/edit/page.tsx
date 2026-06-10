@@ -19,7 +19,7 @@ export default async function EditCardPage({
 
   return (
     <div>
-      <PageHeader index="02·B" title={`edit ${card.term.toLowerCase()}`} />
+      <PageHeader title={`edit ${card.term.toLowerCase()}`} />
       <CardForm action={updateAction} initial={card} submitLabel="Save changes" />
 
       <div className="mt-12 max-w-2xl border-t-[1.5px] border-line pt-6">
