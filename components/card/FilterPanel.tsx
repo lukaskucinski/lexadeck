@@ -1,7 +1,8 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { selectedSet, toggleValue } from "@/lib/filters";
 import {
   CardType,
   Gender,
@@ -16,13 +17,6 @@ import { useViewParams } from "./useViewParams";
 interface DeckOption {
   id: string;
   name: string;
-}
-
-function toggleCsv(current: string | null, value: string): string | null {
-  const parts = new Set((current ?? "").split(",").filter(Boolean));
-  if (parts.has(value)) parts.delete(value);
-  else parts.add(value);
-  return parts.size ? [...parts].join(",") : null;
 }
 
 function CheckRow({
@@ -52,9 +46,16 @@ function CheckRow({
   );
 }
 
+const WORD_TYPE_VALUES = Object.values(WordType);
+const SRS_VALUES = Object.keys(SRS_STATE_LABELS) as SRSState[];
+const GENDER_VALUES = Object.values(Gender);
+const CARD_TYPE_VALUES = Object.values(CardType);
+const HT_VALUES = ["yes", "no"] as const;
+
 export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
   const { searchParams, setParams } = useViewParams();
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const types = searchParams.get("types");
   const genders = searchParams.get("genders");
@@ -63,11 +64,51 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
   const ht = searchParams.get("ht");
   const deckSel = searchParams.get("decks");
 
+  const showDecks = !!decks && decks.length > 1;
+  const deckIds = (decks ?? []).map((d) => d.id);
+
   const activeCount =
     [types, genders, srs, ct, ht, deckSel].filter(Boolean).length;
 
+  // clicking off the panel (or Escape) dismisses it
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const checkedIn = (param: string | null, value: string, all: readonly string[]) =>
+    selectedSet(param, all).has(value);
+
+  const uncheckAll = () => {
+    setParams({
+      types: "none",
+      genders: "none",
+      srs: "none",
+      ct: "none",
+      ht: "none",
+      decks: showDecks ? "none" : null,
+    });
+  };
+
+  const resetAll = () => {
+    setParams({ types: null, genders: null, srs: null, ct: null, ht: null, decks: null });
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         onClick={() => setOpen((v) => !v)}
         className={`flex h-9 items-center gap-2 border-[1.5px] border-line px-3.5 text-[0.68rem] font-extrabold tracking-[0.12em] uppercase transition-colors ${
@@ -83,11 +124,11 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
           <div className="grid grid-cols-2 gap-x-8 gap-y-5 md:grid-cols-3">
             <div>
               <p className="label-caps mb-2 text-muted">Word type</p>
-              {Object.values(WordType).map((wt) => (
+              {WORD_TYPE_VALUES.map((wt) => (
                 <CheckRow
                   key={wt}
-                  checked={(types ?? "").includes(wt)}
-                  onToggle={() => setParams({ types: toggleCsv(types, wt) })}
+                  checked={checkedIn(types, wt, WORD_TYPE_VALUES)}
+                  onToggle={() => setParams({ types: toggleValue(types, wt, WORD_TYPE_VALUES) })}
                   swatch={wordTypeVar(wt)}
                   label={WORD_TYPE_LABELS[wt]}
                 />
@@ -97,11 +138,11 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
             <div className="space-y-5">
               <div>
                 <p className="label-caps mb-2 text-muted">SRS state</p>
-                {(Object.keys(SRS_STATE_LABELS) as SRSState[]).map((s) => (
+                {SRS_VALUES.map((s) => (
                   <CheckRow
                     key={s}
-                    checked={(srs ?? "").includes(s)}
-                    onToggle={() => setParams({ srs: toggleCsv(srs, s) })}
+                    checked={checkedIn(srs, s, SRS_VALUES)}
+                    onToggle={() => setParams({ srs: toggleValue(srs, s, SRS_VALUES) })}
                     swatch={srsStateVar(s)}
                     label={SRS_STATE_LABELS[s]}
                   />
@@ -109,11 +150,11 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
               </div>
               <div>
                 <p className="label-caps mb-2 text-muted">Gender</p>
-                {Object.values(Gender).map((g) => (
+                {GENDER_VALUES.map((g) => (
                   <CheckRow
                     key={g}
-                    checked={(genders ?? "").includes(g)}
-                    onToggle={() => setParams({ genders: toggleCsv(genders, g) })}
+                    checked={checkedIn(genders, g, GENDER_VALUES)}
+                    onToggle={() => setParams({ genders: toggleValue(genders, g, GENDER_VALUES) })}
                     label={g.toLowerCase()}
                   />
                 ))}
@@ -123,11 +164,11 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
             <div className="space-y-5">
               <div>
                 <p className="label-caps mb-2 text-muted">Card type</p>
-                {Object.values(CardType).map((c) => (
+                {CARD_TYPE_VALUES.map((c) => (
                   <CheckRow
                     key={c}
-                    checked={(ct ?? "").includes(c)}
-                    onToggle={() => setParams({ ct: toggleCsv(ct, c) })}
+                    checked={checkedIn(ct, c, CARD_TYPE_VALUES)}
+                    onToggle={() => setParams({ ct: toggleValue(ct, c, CARD_TYPE_VALUES) })}
                     label={c.toLowerCase()}
                   />
                 ))}
@@ -135,24 +176,24 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
               <div>
                 <p className="label-caps mb-2 text-muted">Translation</p>
                 <CheckRow
-                  checked={ht === "yes"}
-                  onToggle={() => setParams({ ht: ht === "yes" ? null : "yes" })}
+                  checked={checkedIn(ht, "yes", HT_VALUES)}
+                  onToggle={() => setParams({ ht: toggleValue(ht, "yes", HT_VALUES) })}
                   label="has translation"
                 />
                 <CheckRow
-                  checked={ht === "no"}
-                  onToggle={() => setParams({ ht: ht === "no" ? null : "no" })}
+                  checked={checkedIn(ht, "no", HT_VALUES)}
+                  onToggle={() => setParams({ ht: toggleValue(ht, "no", HT_VALUES) })}
                   label="missing translation"
                 />
               </div>
-              {decks && decks.length > 1 && (
+              {showDecks && (
                 <div>
                   <p className="label-caps mb-2 text-muted">Deck</p>
-                  {decks.map((d) => (
+                  {decks!.map((d) => (
                     <CheckRow
                       key={d.id}
-                      checked={(deckSel ?? "").includes(d.id)}
-                      onToggle={() => setParams({ decks: toggleCsv(deckSel, d.id) })}
+                      checked={checkedIn(deckSel, d.id, deckIds)}
+                      onToggle={() => setParams({ decks: toggleValue(deckSel, d.id, deckIds) })}
                       label={d.name}
                     />
                   ))}
@@ -161,16 +202,16 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
             </div>
           </div>
 
-          {activeCount > 0 && (
-            <button
-              onClick={() =>
-                setParams({ types: null, genders: null, srs: null, ct: null, ht: null, decks: null })
-              }
-              className="label-caps mt-5 border-t border-soft pt-3 text-coral"
-            >
-              Clear all filters
+          <div className="mt-5 flex items-center gap-5 border-t border-soft pt-3">
+            <button onClick={uncheckAll} className="label-caps text-muted hover:text-ink">
+              Uncheck all
             </button>
-          )}
+            {activeCount > 0 && (
+              <button onClick={resetAll} className="label-caps text-coral">
+                Reset filters
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

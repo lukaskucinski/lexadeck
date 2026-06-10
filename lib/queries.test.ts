@@ -1,0 +1,67 @@
+import { describe, expect, it, vi } from "vitest";
+
+// buildCardWhere/parseCardViewParams are pure; stub the db so importing
+// lib/queries.ts doesn't instantiate a Prisma client
+vi.mock("./db", () => ({ prisma: {} }));
+
+import { buildCardWhere, parseCardViewParams } from "./queries";
+
+describe("parseCardViewParams facet parsing", () => {
+  it("absent params mean no constraint (undefined)", () => {
+    const { filters } = parseCardViewParams({});
+    expect(filters.wordTypes).toBeUndefined();
+    expect(filters.srs).toBeUndefined();
+    expect(filters.hasTranslation).toBeUndefined();
+  });
+
+  it("CSV params parse to value arrays", () => {
+    const { filters } = parseCardViewParams({ types: "NOUN,VERB", ht: "yes" });
+    expect(filters.wordTypes).toEqual(["NOUN", "VERB"]);
+    expect(filters.hasTranslation).toBe(true);
+  });
+
+  it('"none" parses to an empty array / "none" sentinel', () => {
+    const { filters } = parseCardViewParams({ types: "none", srs: "none", ht: "none" });
+    expect(filters.wordTypes).toEqual([]);
+    expect(filters.srs).toEqual([]);
+    expect(filters.hasTranslation).toBe("none");
+  });
+});
+
+describe("buildCardWhere", () => {
+  it("no filters → empty where (everything matches)", () => {
+    expect(buildCardWhere({})).toEqual({});
+  });
+
+  it("a value subset constrains with `in`", () => {
+    const where = buildCardWhere({ wordTypes: ["NOUN"] });
+    expect(where.wordType).toEqual({ in: ["NOUN"] });
+  });
+
+  it("an all-unchecked facet matches nothing", () => {
+    const where = buildCardWhere({ wordTypes: [] });
+    expect(where.wordType).toEqual({ in: [] });
+  });
+
+  it("an all-unchecked SRS facet matches nothing", () => {
+    const where = buildCardWhere({ srs: [] });
+    expect(where.AND).toEqual([{ id: { in: [] } }]);
+  });
+
+  it("SRS states combine as an OR of state conditions", () => {
+    const where = buildCardWhere({ srs: ["new", "mastered"] });
+    const and = where.AND as { OR: unknown[] }[];
+    expect(and).toHaveLength(1);
+    expect(and[0].OR).toHaveLength(2);
+  });
+
+  it('hasTranslation "none" matches nothing', () => {
+    const where = buildCardWhere({ hasTranslation: "none" });
+    expect(where.id).toEqual({ in: [] });
+  });
+
+  it("hasTranslation true/false map to null checks", () => {
+    expect(buildCardWhere({ hasTranslation: true }).translation).toEqual({ not: null });
+    expect(buildCardWhere({ hasTranslation: false }).translation).toBeNull();
+  });
+});

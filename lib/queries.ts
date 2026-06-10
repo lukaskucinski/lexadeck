@@ -38,27 +38,36 @@ export function srsStateWhere(state: SRSState, now: Date = new Date()): Prisma.C
 /* Card filtering shared by deck views + library                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * For the array facets: undefined = no constraint (everything shown), an
+ * empty array = the user unchecked every option ("none" in the URL) and
+ * nothing should match. hasTranslation works the same way via "none".
+ */
 export interface CardFilters {
   q?: string;
   wordTypes?: WordType[];
   genders?: Gender[];
   srs?: SRSState[];
   cardTypes?: CardType[];
-  hasTranslation?: boolean;
+  hasTranslation?: boolean | "none";
   deckIds?: string[];
 }
+
+const MATCH_NOTHING: Prisma.CardWhereInput = { id: { in: [] } };
 
 export type CardSort = "term" | "createdAt" | "due" | "wordType";
 
 export function buildCardWhere(filters: CardFilters, now: Date = new Date()): Prisma.CardWhereInput {
   const where: Prisma.CardWhereInput = {};
 
-  if (filters.deckIds?.length) where.deckId = { in: filters.deckIds };
-  if (filters.wordTypes?.length) where.wordType = { in: filters.wordTypes };
-  if (filters.genders?.length) where.gender = { in: filters.genders };
-  if (filters.cardTypes?.length) where.cardType = { in: filters.cardTypes };
+  // `{ in: [] }` matches no rows, which is exactly what an all-unchecked facet means
+  if (filters.deckIds) where.deckId = { in: filters.deckIds };
+  if (filters.wordTypes) where.wordType = { in: filters.wordTypes };
+  if (filters.genders) where.gender = { in: filters.genders };
+  if (filters.cardTypes) where.cardType = { in: filters.cardTypes };
   if (filters.hasTranslation === true) where.translation = { not: null };
   if (filters.hasTranslation === false) where.translation = null;
+  if (filters.hasTranslation === "none") where.id = MATCH_NOTHING.id;
 
   if (filters.q) {
     where.OR = [
@@ -67,9 +76,10 @@ export function buildCardWhere(filters: CardFilters, now: Date = new Date()): Pr
     ];
   }
 
-  if (filters.srs?.length) {
-    const srsConditions = filters.srs.map((s) => srsStateWhere(s, now));
-    where.AND = [{ OR: srsConditions }];
+  if (filters.srs) {
+    where.AND = filters.srs.length
+      ? [{ OR: filters.srs.map((s) => srsStateWhere(s, now)) }]
+      : [MATCH_NOTHING];
   }
 
   return where;
@@ -176,8 +186,9 @@ export interface CardViewParams {
   page: number;
 }
 
+// "none" = the user unchecked every option in that facet → empty array
 const csv = (v: string | undefined) =>
-  v ? (v.split(",").filter(Boolean) as string[]) : undefined;
+  v == null ? undefined : v === "none" ? [] : (v.split(",").filter(Boolean) as string[]);
 
 export function parseCardViewParams(sp: Record<string, string | string[] | undefined>): CardViewParams {
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
@@ -199,7 +210,8 @@ export function parseCardViewParams(sp: Record<string, string | string[] | undef
       genders: csv(get("genders")) as CardFilters["genders"],
       srs: csv(get("srs")) as CardFilters["srs"],
       cardTypes: csv(get("ct")) as CardFilters["cardTypes"],
-      hasTranslation: ht === "yes" ? true : ht === "no" ? false : undefined,
+      hasTranslation:
+        ht === "yes" ? true : ht === "no" ? false : ht === "none" ? "none" : undefined,
       deckIds: csv(get("decks")),
     },
   };

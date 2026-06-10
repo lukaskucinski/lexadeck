@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { setCardMastered } from "@/lib/actions/cards";
 import { endSession, startSession, submitReview } from "@/lib/actions/study";
 import { formatDueIn, previewIntervals, Rating, type Grade } from "@/lib/srs";
 import { REQUEUE_WINDOW_MS, type StudyCard } from "@/lib/study";
@@ -116,10 +117,14 @@ export function StudySession({
       setWash(WASH_COLOR[rating]);
       setTimeout(() => setWash(null), 220);
 
-      setCounts((prev) => {
-        const key = RATING_KEY[rating];
-        return { ...prev, [key]: prev[key] + 1 };
-      });
+      // tallies record each card's FIRST rating only (pass 0 = first
+      // appearance), so they sum to cards studied; `done` counts every review
+      if (pass === 0) {
+        setCounts((prev) => {
+          const key = RATING_KEY[rating];
+          return { ...prev, [key]: prev[key] + 1 };
+        });
+      }
       setDone((d) => d + 1);
       setStudied((prev) => (prev.has(card.id) ? prev : new Set(prev).add(card.id)));
       setRevealed(false);
@@ -150,6 +155,19 @@ export function StudySession({
     [current, revealed],
   );
 
+  // manual mastery mid-session: persist the flag and drop every queued
+  // appearance of the card; not counted as a rating
+  const master = useCallback(() => {
+    if (!current) return;
+    const { card } = current;
+    setExitDir(1);
+    setWash(WASH_COLOR[Rating.Easy]);
+    setTimeout(() => setWash(null), 220);
+    setRevealed(false);
+    setQueue((prev) => prev.filter((item) => item.card.id !== card.id));
+    setCardMastered(card.id, true).catch((err) => console.error("master failed:", err));
+  }, [current]);
+
   // session ends when the queue stays drained — the grace period lets an
   // in-flight "Again" re-queue land instead of ending the session under it
   useEffect(() => {
@@ -158,13 +176,18 @@ export function StudySession({
     return () => clearTimeout(timer);
   }, [phase, queue.length, finish]);
 
-  // keyboard: space/enter reveal, 1-4 rate
+  // keyboard: space/enter reveal, 1-4 rate, m masters
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (phase !== "active") return;
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         if (!revealed) setRevealed(true);
+        return;
+      }
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        master();
         return;
       }
       if (revealed && ["1", "2", "3", "4"].includes(e.key)) {
@@ -174,7 +197,7 @@ export function StudySession({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, revealed, rate]);
+  }, [phase, revealed, rate, master]);
 
   /* ---------- preview ---------- */
   if (phase === "preview") {
@@ -243,8 +266,11 @@ export function StudySession({
 
   /* ---------- summary ---------- */
   if (phase === "done") {
-    const total = done;
-    const accuracy = total > 0 ? Math.round(((total - counts.again) / total) * 100) : 0;
+    const cardsStudied = studied.size;
+    const accuracy =
+      cardsStudied > 0
+        ? Math.round(((cardsStudied - counts.again) / cardsStudied) * 100)
+        : 0;
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-start justify-center px-6">
         <p className="label-caps text-muted">{deckName}</p>
@@ -253,14 +279,18 @@ export function StudySession({
         </h1>
 
         <div className="mt-8 w-full border-[1.5px] border-line">
-          <div className="grid grid-cols-2">
-            <div className="border-r border-soft px-5 py-4">
-              <div className="tnum text-4xl font-black">{studied.size}</div>
-              <div className="label-caps mt-1 text-muted">Cards studied</div>
+          <div className="grid grid-cols-3">
+            <div className="border-r border-soft px-4 py-4">
+              <div className="tnum text-3xl font-black">{cardsStudied}</div>
+              <div className="label-caps mt-1 text-muted">Cards</div>
             </div>
-            <div className="px-5 py-4">
-              <div className="tnum text-4xl font-black">{accuracy}%</div>
-              <div className="label-caps mt-1 text-muted">Accuracy</div>
+            <div className="border-r border-soft px-4 py-4">
+              <div className="tnum text-3xl font-black">{done}</div>
+              <div className="label-caps mt-1 text-muted">Reviews</div>
+            </div>
+            <div className="px-4 py-4">
+              <div className="tnum text-3xl font-black">{accuracy}%</div>
+              <div className="label-caps mt-1 text-muted">First try</div>
             </div>
           </div>
           <div className="grid grid-cols-4 border-t border-line">
@@ -283,6 +313,9 @@ export function StudySession({
                 <div className="label-caps mt-0.5 text-muted">{key}</div>
               </div>
             ))}
+          </div>
+          <div className="border-t border-line px-5 py-3 text-[0.72rem] font-semibold text-muted">
+            Ratings count your first answer per card · repeats show up in reviews
           </div>
         </div>
 
@@ -379,6 +412,13 @@ export function StudySession({
             Reveal answer
           </button>
         )}
+        <button
+          onClick={master}
+          disabled={!current}
+          className="mt-3 h-8 w-full text-[0.68rem] font-extrabold tracking-[0.12em] uppercase text-muted transition-colors hover:text-ink disabled:opacity-0"
+        >
+          ✓ Mark mastered · removes from study (M)
+        </button>
       </div>
     </div>
   );

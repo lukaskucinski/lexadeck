@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "LexaDeck",
     short_name: "LexaDeck",
-    description: "A typographic language flashcard studio",
+    description: "A typographic language learning flashcard studio",
     start_url: "/",
     display: "standalone",
     background_color: "#FAFAF6",

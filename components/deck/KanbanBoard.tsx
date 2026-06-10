@@ -235,8 +235,32 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
     startTransition(() => setCardWordType(card.id, target));
   }
 
+  const canScroll = overflow.left || overflow.right;
+
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      {/* scroll controls sit above the board so they never overlap columns */}
+      {canScroll && (
+        <div className="mb-3 hidden justify-end md:flex">
+          <button
+            onClick={() => nudge(-1)}
+            disabled={!overflow.left}
+            aria-label="Scroll columns left"
+            className="flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors enabled:hover:bg-ink enabled:hover:text-bg disabled:border-soft disabled:text-muted/40"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            onClick={() => nudge(1)}
+            disabled={!overflow.right}
+            aria-label="Scroll columns right"
+            className="-ml-[1.5px] flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors enabled:hover:bg-ink enabled:hover:text-bg disabled:border-soft disabled:text-muted/40"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
       <div className="relative">
         <div
           ref={scrollerRef}
@@ -254,30 +278,12 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
           ))}
         </div>
 
-        {/* overflow affordances: edge fades + desktop scroll buttons */}
+        {/* edge fades hint at horizontally clipped columns */}
         {overflow.left && (
-          <>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg to-transparent" />
-            <button
-              onClick={() => nudge(-1)}
-              aria-label="Scroll columns left"
-              className="absolute top-1/2 left-0 hidden h-9 w-9 -translate-y-1/2 items-center justify-center border-[1.5px] border-line bg-bg text-muted transition-colors hover:bg-ink hover:text-bg md:flex"
-            >
-              <ChevronLeft size={17} />
-            </button>
-          </>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg to-transparent" />
         )}
         {overflow.right && (
-          <>
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent" />
-            <button
-              onClick={() => nudge(1)}
-              aria-label="Scroll columns right"
-              className="absolute top-1/2 right-0 hidden h-9 w-9 -translate-y-1/2 items-center justify-center border-[1.5px] border-line bg-bg text-muted transition-colors hover:bg-ink hover:text-bg md:flex"
-            >
-              <ChevronRight size={17} />
-            </button>
-          </>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent" />
         )}
       </div>
       <DragOverlay>{active && <KanbanCard card={active} overlay />}</DragOverlay>

@@ -7,15 +7,26 @@
  *      DEEPL_API_KEY + ENABLE_DEEPL_FALLBACK (optional)
  */
 
+/**
+ * Values pasted into dashboards (e.g. Vercel env vars) can carry a BOM
+ * (U+FEFF) or stray whitespace; a BOM-prefixed key corrupts HTTP headers
+ * ("Cannot convert argument to a ByteString… 65279") and query strings
+ * ("API key not valid"). Returns undefined only when the var is unset.
+ */
+function env(name: string): string | undefined {
+  const raw = process.env[name];
+  return raw == null ? undefined : raw.replace(/\uFEFF/g, "").trim();
+}
+
 /* ------------------------------------------------------------------ */
 /* Translation: Azure AI Translator primary, DeepL optional fallback   */
 /* ------------------------------------------------------------------ */
 
 export async function azureTranslate(texts: string[]): Promise<string[]> {
-  const key = process.env.AZURE_TRANSLATOR_KEY;
+  const key = env("AZURE_TRANSLATOR_KEY");
   const endpoint =
-    process.env.AZURE_TRANSLATOR_ENDPOINT ?? "https://api.cognitive.microsofttranslator.com";
-  const region = process.env.AZURE_TRANSLATOR_REGION;
+    env("AZURE_TRANSLATOR_ENDPOINT") || "https://api.cognitive.microsofttranslator.com";
+  const region = env("AZURE_TRANSLATOR_REGION");
   if (!key) throw new Error("AZURE_TRANSLATOR_KEY is not set");
   if (!region) throw new Error("AZURE_TRANSLATOR_REGION is not set");
 
@@ -36,8 +47,8 @@ export async function azureTranslate(texts: string[]): Promise<string[]> {
 }
 
 export async function deeplTranslate(texts: string[]): Promise<string[]> {
-  const key = process.env.DEEPL_API_KEY;
-  const base = process.env.DEEPL_API_BASE_URL ?? "https://api-free.deepl.com/v2";
+  const key = env("DEEPL_API_KEY");
+  const base = env("DEEPL_API_BASE_URL") || "https://api-free.deepl.com/v2";
   if (!key) throw new Error("DEEPL_API_KEY is not set");
 
   const res = await fetch(`${base}/translate`, {
@@ -65,7 +76,7 @@ export async function translateBatch(
   try {
     return { provider: "azure", out: await azureTranslate(texts) };
   } catch (err) {
-    if (process.env.ENABLE_DEEPL_FALLBACK === "true") {
+    if (env("ENABLE_DEEPL_FALLBACK") === "true") {
       console.warn(`Azure failed (${(err as Error).message}); falling back to DeepL`);
       return { provider: "deepl_fallback", out: await deeplTranslate(texts) };
     }
@@ -160,12 +171,12 @@ async function geminiGenerate(
 }
 
 export async function geminiEnrich(cards: EnrichableCard[]): Promise<EnrichmentItem[]> {
-  const key = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+  const key = env("GEMINI_API_KEY");
+  const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
   // flash-lite has its own (higher) free-tier quota — used when the primary
   // model is overloaded or this key's daily limit is exhausted (503/429).
   // Set GEMINI_FALLBACK_MODEL="" to disable.
-  const fallback = process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash-lite";
+  const fallback = env("GEMINI_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
   const cardLines = cards.map((c) =>

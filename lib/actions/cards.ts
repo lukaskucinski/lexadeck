@@ -72,6 +72,12 @@ export async function createCard(
   const deck = await prisma.deck.findUnique({ where: { id: deckId } });
   if (!deck) return { error: "Deck not found" };
 
+  const dupe = await prisma.card.findFirst({
+    where: { deckId, term: { equals: parsed.data.term, mode: "insensitive" } },
+    select: { term: true },
+  });
+  if (dupe) return { error: `“${dupe.term}” is already in this deck` };
+
   await prisma.card.create({
     data: {
       deckId,
