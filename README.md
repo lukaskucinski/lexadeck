@@ -3,7 +3,7 @@
 A Swiss-typographic Spanish flashcard studio. Next.js + Supabase Postgres + FSRS
 (`ts-fsrs`) scheduling, populated from a Notion export, enriched via DeepL + Gemini.
 
-Full design + architecture: [LEXADECK_SPEC.md](./LEXADECK_SPEC.md)
+Full design + architecture: [LEXADECK_SPEC.md](./.claude/docs/LEXADECK_SPEC.md)
 
 ## Setup
 

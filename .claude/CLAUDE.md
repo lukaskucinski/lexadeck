@@ -8,8 +8,8 @@ Supabase project: `kuoediscikartsdebdfo` (us-east-1, "Kucinski GIS" account — 
 Supabase MCP must be authenticated against that account, not OSIT).
 
 ## Canonical Docs
-- `LEXADECK_SPEC.md` — architecture spec. **The v0.2 Amendments table at the top
-  supersedes conflicting v0.1 sections below it** (design language, SRS, API style).
+- [Spec](docs/LEXADECK_SPEC.md) — architecture spec. **The v0.2 Amendments table at
+  the top supersedes conflicting v0.1 sections below it** (design language, SRS, API style).
 - `README.md` — setup, env vars, scripts.
 - [Design System](docs/DESIGN_SYSTEM.md) — Swiss Typographic rules for all UI work.
 

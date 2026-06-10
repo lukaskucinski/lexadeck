@@ -46,3 +46,5 @@ design-spike/check-*.png
 
 # prisma generated client
 lib/generated/
+
+.vercel
