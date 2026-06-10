@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sparkles } from "lucide-react";
+import { CardStatusActions } from "@/components/card/CardStatusActions";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { prisma } from "@/lib/db";
@@ -102,10 +103,11 @@ export default async function CardDetailPage({
         </div>
       </article>
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
         <ButtonLink href={`/decks/${id}/cards/${cardId}/edit`} variant="outline">
           Edit card
         </ButtonLink>
+        <CardStatusActions cardId={cardId} srs={srs} />
         {/* v2 AI affordance — reserved per spec */}
         <span
           title="AI enrich — coming in v2"

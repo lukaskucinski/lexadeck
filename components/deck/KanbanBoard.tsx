@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { setCardWordType } from "@/lib/actions/cards";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
+import { CardActionsMenu } from "@/components/card/CardActionsMenu";
 import type { CardRow } from "@/components/card/cardRow";
 
 const COLUMN_ORDER: WordType[] = [
@@ -55,7 +56,7 @@ function KanbanCard({
       ref={overlay ? undefined : setNodeRef}
       {...(overlay ? {} : { ...attributes, ...listeners })}
       onClick={() => onOpen?.(card)}
-      className={`flex items-center justify-between gap-2 border-b border-soft bg-bg px-3.5 py-2.5 last:border-b-0 ${
+      className={`group flex items-center justify-between gap-2 border-b border-soft bg-bg px-3.5 py-2.5 last:border-b-0 ${
         isDragging && !overlay ? "opacity-30" : ""
       } ${overlay ? "border-[1.5px] border-line shadow-[4px_4px_0_0_var(--c-soft)]" : "cursor-pointer hover:bg-soft/40"}`}
     >
@@ -72,11 +73,21 @@ function KanbanCard({
           {card.translation ?? "—"}
         </div>
       </div>
-      <i
-        title={SRS_STATE_LABELS[card.srs]}
-        className="h-2 w-2 shrink-0"
-        style={{ background: srsStateVar(card.srs) }}
-      />
+      <div className="flex shrink-0 items-center gap-1.5">
+        {!overlay && (
+          <CardActionsMenu
+            cardId={card.id}
+            deckId={card.deckId}
+            srs={card.srs}
+            className="md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-within:opacity-100"
+          />
+        )}
+        <i
+          title={SRS_STATE_LABELS[card.srs]}
+          className="h-2 w-2 shrink-0"
+          style={{ background: srsStateVar(card.srs) }}
+        />
+      </div>
     </div>
   );
 }

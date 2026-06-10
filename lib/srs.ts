@@ -140,9 +140,13 @@ export function formatDueIn(ms: number): string {
 
 /** Display-level state used for badges, filters and stats. */
 export function getSRSState(
-  fields: Pick<SchedulerFields, "state" | "due" | "stability">,
+  fields: Pick<SchedulerFields, "state" | "due" | "stability"> & {
+    /** manual override — set via "Mark mastered" */
+    masteredAt?: Date | null;
+  },
   now: Date = new Date(),
 ): SRSState {
+  if (fields.masteredAt) return "mastered";
   switch (fields.state) {
     case State.New:
       return "new";

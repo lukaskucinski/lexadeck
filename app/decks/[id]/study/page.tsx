@@ -110,7 +110,7 @@ export default async function StudyPage({
 
   // Reviewed cards that are due (learning + review states)
   const dueCards = await prisma.card.findMany({
-    where: { deckId: id, due: { lte: now }, state: { not: 0 } },
+    where: { deckId: id, due: { lte: now }, state: { not: 0 }, masteredAt: null },
     orderBy: { due: "asc" },
     select: STUDY_SELECT,
     take: MAX_SESSION_SIZE,
@@ -124,7 +124,7 @@ export default async function StudyPage({
   const newCards =
     newBudget > 0
       ? await prisma.card.findMany({
-          where: { deckId: id, state: 0 },
+          where: { deckId: id, state: 0, masteredAt: null },
           orderBy: { createdAt: "asc" },
           select: STUDY_SELECT,
           take: newBudget,

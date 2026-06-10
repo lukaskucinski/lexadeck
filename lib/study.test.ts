@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   emptySchedulerFields,
   formatDueIn,
+  getSRSState,
   previewIntervals,
   Rating,
 } from "./srs";
@@ -70,6 +71,19 @@ describe("formatDueIn", () => {
     expect(formatDueIn(12 * 86_400_000)).toBe("12d");
     expect(formatDueIn(120 * 86_400_000)).toBe("4mo");
     expect(formatDueIn(548 * 86_400_000)).toBe("1.5y");
+  });
+});
+
+describe("manual mastered override", () => {
+  it("masteredAt wins over any FSRS-derived state", () => {
+    const now = new Date("2026-06-01T12:00:00Z");
+    const newCard = { state: 0, due: now, stability: 0 };
+    expect(getSRSState(newCard, now)).toBe("new");
+    expect(getSRSState({ ...newCard, masteredAt: now }, now)).toBe("mastered");
+    // and a due review card
+    expect(
+      getSRSState({ state: 2, due: now, stability: 5, masteredAt: now }, now),
+    ).toBe("mastered");
   });
 });
 

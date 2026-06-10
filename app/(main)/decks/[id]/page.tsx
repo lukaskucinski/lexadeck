@@ -35,6 +35,7 @@ const CARD_SELECT = {
   due: true,
   state: true,
   stability: true,
+  masteredAt: true,
 } as const;
 
 export default async function DeckDetailPage({
@@ -54,7 +55,7 @@ export default async function DeckDetailPage({
   const where = { deckId: id, ...buildCardWhere(vp.filters, now) };
   const [total, ready, session] = await Promise.all([
     prisma.card.count({ where: { deckId: id } }),
-    prisma.card.count({ where: { deckId: id, due: { lte: now } } }),
+    prisma.card.count({ where: { deckId: id, due: { lte: now }, masteredAt: null } }),
     getStudySessionCounts(id, now),
   ]);
 

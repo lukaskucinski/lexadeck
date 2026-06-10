@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useTransition } from "react";
 import { deleteCards, updateCardInline } from "@/lib/actions/cards";
+import { CardActionsMenu } from "./CardActionsMenu";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { Button } from "@/components/ui/Button";
@@ -228,15 +228,8 @@ export function CardListTable({
               <td className="tnum px-3 py-2 text-[0.78rem] font-semibold text-muted">
                 {dueLabel(card.due)}
               </td>
-              <td className="px-3 py-2">
-                <Link
-                  href={`/decks/${card.deckId}/cards/${card.id}`}
-                  className="text-muted hover:text-ink"
-                  title="Open card"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ArrowUpRight size={16} />
-                </Link>
+              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <CardActionsMenu cardId={card.id} deckId={card.deckId} srs={card.srs} />
               </td>
             </tr>
           ))}

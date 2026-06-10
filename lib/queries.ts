@@ -11,22 +11,25 @@ import type { CardType, Gender, SRSState, WordType } from "./types";
 export function srsStateWhere(state: SRSState, now: Date = new Date()): Prisma.CardWhereInput {
   switch (state) {
     case "new":
-      return { state: 0 };
+      return { masteredAt: null, state: 0 };
     case "learning":
-      return { state: { in: [1, 3] } };
+      return { masteredAt: null, state: { in: [1, 3] } };
     case "due":
-      return { state: 2, due: { lte: now } };
+      return { masteredAt: null, state: 2, due: { lte: now } };
     case "scheduled":
       return {
+        masteredAt: null,
         state: 2,
         due: { gt: now },
         stability: { lt: MASTERED_STABILITY_DAYS },
       };
     case "mastered":
+      // manual flag OR earned via FSRS stability
       return {
-        state: 2,
-        due: { gt: now },
-        stability: { gte: MASTERED_STABILITY_DAYS },
+        OR: [
+          { masteredAt: { not: null } },
+          { state: 2, due: { gt: now }, stability: { gte: MASTERED_STABILITY_DAYS } },
+        ],
       };
   }
 }
@@ -98,8 +101,10 @@ export async function getStudySessionCounts(
   now: Date = new Date(),
 ): Promise<SessionCounts> {
   const [due, fresh] = await Promise.all([
-    prisma.card.count({ where: { deckId, due: { lte: now }, state: { not: 0 } } }),
-    prisma.card.count({ where: { deckId, state: 0 } }),
+    prisma.card.count({
+      where: { deckId, due: { lte: now }, state: { not: 0 }, masteredAt: null },
+    }),
+    prisma.card.count({ where: { deckId, state: 0, masteredAt: null } }),
   ]);
   return sessionCounts(due, fresh);
 }
@@ -126,7 +131,7 @@ export async function getDeckSummaries(now: Date = new Date()): Promise<DeckSumm
     prisma.card.groupBy({ by: ["deckId"], _count: { _all: true } }),
     prisma.card.groupBy({
       by: ["deckId"],
-      where: { due: { lte: now } },
+      where: { due: { lte: now }, masteredAt: null },
       _count: { _all: true },
     }),
     prisma.card.groupBy({

@@ -131,6 +131,29 @@ export async function setCardWordType(
   revalidateCardPaths(card.deckId);
 }
 
+/** Manual mastery: a mastered card never enters study sessions. */
+export async function setCardMastered(cardId: string, mastered: boolean): Promise<void> {
+  const card = await prisma.card.update({
+    where: { id: cardId },
+    data: { masteredAt: mastered ? new Date() : null },
+  });
+  revalidateCardPaths(card.deckId);
+  revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
+}
+
+/**
+ * Pull a card into the review rotation now. Also clears a manual mastered
+ * flag — "unmaster" means the card should be studyable again.
+ */
+export async function queueCardForReview(cardId: string): Promise<void> {
+  const card = await prisma.card.update({
+    where: { id: cardId },
+    data: { due: new Date(), masteredAt: null },
+  });
+  revalidateCardPaths(card.deckId);
+  revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
+}
+
 export async function deleteCard(cardId: string): Promise<void> {
   const card = await prisma.card.delete({ where: { id: cardId } });
   revalidateCardPaths(card.deckId);
