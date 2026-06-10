@@ -7,6 +7,7 @@ import {
   House,
   Layers,
   LibraryBig,
+  Settings,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/decks", label: "Decks", icon: Layers },
   { href: "/library", label: "Library", icon: LibraryBig },
   { href: "/progress", label: "Progress", icon: ChartNoAxesColumn },
+  { href: "/settings", label: "More", icon: Settings },
 ] as const;
 
 function isActive(pathname: string, href: string) {
