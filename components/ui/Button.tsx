@@ -4,10 +4,10 @@ import type { ComponentProps, ReactNode } from "react";
 type Variant = "primary" | "outline" | "ghost" | "danger";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-ink text-bg hover:bg-coral hover:text-white",
+  primary: "bg-ink text-bg hover:bg-coral hover:text-bg",
   outline: "border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg",
   ghost: "text-muted hover:text-ink",
-  danger: "border-[1.5px] border-coral text-coral hover:bg-coral hover:text-white",
+  danger: "border-[1.5px] border-coral text-coral hover:bg-coral hover:text-bg",
 };
 
 const BASE =

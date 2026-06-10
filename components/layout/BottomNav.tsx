@@ -8,6 +8,7 @@ import {
   Layers,
   LibraryBig,
 } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: House },
@@ -40,6 +41,7 @@ export function BottomNav() {
           </Link>
         );
       })}
+      <ThemeToggle variant="bar" />
     </nav>
   );
 }

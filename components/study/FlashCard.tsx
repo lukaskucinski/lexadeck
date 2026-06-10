@@ -55,7 +55,7 @@ export function FlashCard({
             </span>
             <span className="label-caps ml-auto text-muted">{card.language}</span>
             {card.isNew && (
-              <span className="bg-blue px-1.5 py-0.5 text-[0.58rem] font-extrabold tracking-[0.1em] text-white uppercase">
+              <span className="bg-blue px-1.5 py-0.5 text-[0.58rem] font-extrabold tracking-[0.1em] text-bg uppercase">
                 New
               </span>
             )}

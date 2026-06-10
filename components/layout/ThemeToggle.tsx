@@ -25,8 +25,29 @@ function setTheme(next: Theme) {
   for (const listener of listeners) listener();
 }
 
-export function ThemeToggle({ className = "" }: { className?: string }) {
+export function ThemeToggle({
+  className = "",
+  variant = "rail",
+}: {
+  className?: string;
+  /** "rail" = square icon button (NavRail) · "bar" = labeled BottomNav slot */
+  variant?: "rail" | "bar";
+}) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, () => "light" as Theme);
+  const Icon = theme === "dark" ? Sun : Moon;
+
+  if (variant === "bar") {
+    return (
+      <button
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        aria-label="Toggle theme"
+        className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] text-muted uppercase ${className}`}
+      >
+        <Icon size={20} strokeWidth={2} />
+        Theme
+      </button>
+    );
+  }
 
   return (
     <button
@@ -35,7 +56,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       title="Toggle theme"
       className={`flex h-10 w-10 items-center justify-center text-muted transition-colors hover:bg-soft hover:text-ink ${className}`}
     >
-      {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+      <Icon size={19} />
     </button>
   );
 }
