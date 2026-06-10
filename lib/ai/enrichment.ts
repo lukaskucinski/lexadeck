@@ -107,9 +107,65 @@ const RESPONSE_SCHEMA = {
   },
 } as const;
 
+class GeminiHttpError extends Error {
+  constructor(
+    public status: number,
+    body: string,
+  ) {
+    super(`Gemini ${status}: ${body}`);
+  }
+}
+
+/** Overloaded / rate-limited / transient — worth retrying on another model. */
+function isRetryable(err: unknown): boolean {
+  return (
+    err instanceof GeminiHttpError &&
+    (err.status === 429 || err.status >= 500)
+  );
+}
+
+async function geminiGenerate(
+  model: string,
+  key: string,
+  prompt: string,
+): Promise<EnrichmentItem[]> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA,
+          temperature: 0.4,
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new GeminiHttpError(res.status, await res.text());
+  }
+
+  const data = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini returned no content");
+
+  const parsed = JSON.parse(text) as EnrichmentItem[];
+  if (!Array.isArray(parsed)) throw new Error("Gemini response is not an array");
+  return parsed;
+}
+
 export async function geminiEnrich(cards: EnrichableCard[]): Promise<EnrichmentItem[]> {
   const key = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+  // flash-lite has its own (higher) free-tier quota — used when the primary
+  // model is overloaded or this key's daily limit is exhausted (503/429).
+  // Set GEMINI_FALLBACK_MODEL="" to disable.
+  const fallback = process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash-lite";
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
   const cardLines = cards.map((c) =>
@@ -135,32 +191,15 @@ Do not contradict the given translation. Return a JSON array with one object per
 Cards:
 ${cardLines.join("\n")}`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
-          temperature: 0.4,
-        },
-      }),
-    },
-  );
-  if (!res.ok) {
-    throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  try {
+    return await geminiGenerate(model, key, prompt);
+  } catch (err) {
+    if (fallback && fallback !== model && isRetryable(err)) {
+      console.warn(
+        `Gemini ${model} unavailable (${(err as Error).message.slice(0, 120)}…) — retrying with ${fallback}`,
+      );
+      return geminiGenerate(fallback, key, prompt);
+    }
+    throw err;
   }
-
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini returned no content");
-
-  const parsed = JSON.parse(text) as EnrichmentItem[];
-  if (!Array.isArray(parsed)) throw new Error("Gemini response is not an array");
-  return parsed;
 }
