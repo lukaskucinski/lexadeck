@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultLangTag, pickVoice, type VoiceLike } from "./speech";
+import { defaultLangTag, detectLanguage, pickVoice, type VoiceLike } from "./speech";
 
 const voice = (name: string, lang: string, localService: boolean): VoiceLike => ({
   name,
@@ -45,6 +45,35 @@ describe("pickVoice — English (mechanical-voice board fix)", () => {
   it("still ranks quality within the preferred variant", () => {
     const inGB = voice("Google UK English Female", "en-GB", false);
     expect(pickVoice([DAVID, inGB, ARIA_NATURAL], "en")).toBe(ARIA_NATURAL);
+  });
+});
+
+// board fix: English text spoken with a Spanish voice — the caller's lang is
+// per-card, but card content can be the other language (e.g. grammar-card
+// terms are English titles), so detect from the text itself
+describe("detectLanguage", () => {
+  it("Spanish diacritics and punctuation are decisive", () => {
+    expect(detectLanguage("¿Cómo estás?", "en")).toBe("es");
+    expect(detectLanguage("El niño pequeño", "en")).toBe("es");
+  });
+
+  it("recognizes Spanish stopwords without diacritics", () => {
+    expect(detectLanguage("el perro grande de la casa", "en")).toBe("es");
+  });
+
+  it("recognizes English stopwords", () => {
+    expect(detectLanguage("the house is big", "es")).toBe("en");
+    expect(detectLanguage("to walk quickly", "es")).toBe("en");
+  });
+
+  it("recognizes English orthography in title-style text (grammar terms)", () => {
+    expect(detectLanguage("Direct Object Pronouns", "es")).toBe("en");
+    expect(detectLanguage("Present Progressive", "es")).toBe("en");
+  });
+
+  it("falls back when there is no signal", () => {
+    expect(detectLanguage("perro", "es")).toBe("es");
+    expect(detectLanguage("1234 ✦", "en")).toBe("en");
   });
 });
 

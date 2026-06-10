@@ -2,7 +2,7 @@
 
 import { Volume2 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { defaultLangTag, pickVoice } from "@/lib/speech";
+import { defaultLangTag, detectLanguage, pickVoice } from "@/lib/speech";
 
 const noopSubscribe = () => () => {};
 
@@ -60,9 +60,12 @@ export function SpeakButton({
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = pickVoice(synth.getVoices(), lang);
+    // the prop lang is per-card; the text itself wins when it clearly
+    // disagrees (e.g. English grammar-card titles in a Spanish deck)
+    const ttsLang = detectLanguage(text, lang);
+    const voice = pickVoice(synth.getVoices(), ttsLang);
     if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang ?? defaultLangTag(lang);
+    utterance.lang = voice?.lang ?? defaultLangTag(ttsLang);
     utterance.rate = 0.95;
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);

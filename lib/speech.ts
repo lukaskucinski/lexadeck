@@ -18,6 +18,38 @@ export function defaultLangTag(lang: string): string {
   return DEFAULT_REGION[lang.toLowerCase()] ?? lang;
 }
 
+const ES_STOPWORDS = new Set(
+  "el la los las un una unos unas de del al que es son en con por para se su sus lo como pero este esta estos estas hay muy y o".split(" "),
+);
+const EN_STOPWORDS = new Set(
+  "the of to and is are was were be been it its this that these those with for from when which how what you your they them he she we who will would can not on in at an or".split(" "),
+);
+// orthography essentially absent from native Spanish words
+const EN_PATTERNS = /th|ou|ee|oo|ss|ck|gh|ph|[wk]/;
+
+/**
+ * Decide whether text is Spanish or English so the right voice speaks it.
+ * The caller's lang is per-card, but card content can be the other language
+ * (board bug: grammar-card terms are English titles, read with a Spanish
+ * voice). Spanish diacritics decide outright; otherwise stopwords and
+ * English-only orthography vote, and a tie keeps the caller's fallback.
+ */
+export function detectLanguage(text: string, fallback: string): string {
+  if (/[¿¡ñáéíóúü]/i.test(text)) return "es";
+
+  const words = text.toLowerCase().match(/[a-z']+/g) ?? [];
+  let es = 0;
+  let en = 0;
+  for (const word of words) {
+    if (ES_STOPWORDS.has(word)) es++;
+    if (EN_STOPWORDS.has(word)) en++;
+    else if (EN_PATTERNS.test(word)) en++;
+  }
+  if (en > es) return "en";
+  if (es > en) return "es";
+  return fallback;
+}
+
 /**
  * Choose the best available voice for a language.
  *
