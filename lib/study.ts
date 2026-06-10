@@ -1,10 +1,26 @@
 import type { SchedulerFields } from "./srs";
-import type { CardType, Gender, WordType } from "./types";
+import { WordType, type CardType, type Gender } from "./types";
 
 export const MAX_SESSION_SIZE = 50;
 export const MAX_NEW_PER_SESSION = 10;
 /** Re-queue a rated card into the running session if it comes due this soon. */
 export const REQUEUE_WINDOW_MS = 12 * 60_000;
+
+/** Cookie holding word types excluded from study (CSV; set on /settings). */
+export const STUDY_EXCLUDE_COOKIE = "ld-study-exclude";
+
+/** Parse the exclusion cookie into valid word types (tolerates URL-encoding). */
+export function parseStudyExclude(raw: string | undefined): WordType[] {
+  if (!raw) return [];
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // malformed escape — fall through with the raw value
+  }
+  const valid = new Set<string>(Object.values(WordType));
+  return [...new Set(decoded.split(","))].filter((v): v is WordType => valid.has(v));
+}
 
 /** Everything the study UI needs to render one card. */
 export interface StudyCard {

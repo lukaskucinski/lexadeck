@@ -40,7 +40,7 @@ export default async function DashboardPage() {
     <div>
       <header className="border-b-[3px] border-line pb-8">
         <p className="label-caps mb-4 text-muted">
-          lexadeck<span className="text-coral">.</span> — language learning flashcard studio
+          lexadeck<span className="text-coral">.</span> — flashcard language learning
         </p>
         <h1 className="type-display text-5xl md:text-7xl">
           {greeting()},

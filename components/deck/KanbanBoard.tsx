@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { setCardWordType } from "@/lib/actions/cards";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
@@ -160,6 +160,7 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
   const [, startTransition] = useTransition();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
+  const [fullscreen, setFullscreen] = useState(false);
   // the click that follows a drop must not open the card
   const justDragged = useRef(false);
 
@@ -182,11 +183,27 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
     });
   }, []);
 
+  // re-measure when the board resizes into/out of the full-screen overlay
   useEffect(() => {
     updateOverflow();
     window.addEventListener("resize", updateOverflow);
     return () => window.removeEventListener("resize", updateOverflow);
-  }, [updateOverflow]);
+  }, [updateOverflow, fullscreen]);
+
+  // full screen: Escape exits, the page behind stays put
+  useEffect(() => {
+    if (!fullscreen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setFullscreen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [fullscreen]);
 
   const openCard = useCallback(
     (card: CardRow) => {
@@ -239,52 +256,75 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      {/* scroll controls sit above the board so they never overlap columns */}
-      {canScroll && (
-        <div className="mb-3 hidden justify-end md:flex">
-          <button
-            onClick={() => nudge(-1)}
-            disabled={!overflow.left}
-            aria-label="Scroll columns left"
-            className="flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors enabled:hover:bg-ink enabled:hover:text-bg disabled:border-soft disabled:text-muted/40"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <button
-            onClick={() => nudge(1)}
-            disabled={!overflow.right}
-            aria-label="Scroll columns right"
-            className="-ml-[1.5px] flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors enabled:hover:bg-ink enabled:hover:text-bg disabled:border-soft disabled:text-muted/40"
-          >
-            <ChevronRight size={16} />
-          </button>
+      <div
+        className={
+          fullscreen ? "fixed inset-0 z-50 flex flex-col bg-bg px-5 py-4 md:px-8 md:py-5" : ""
+        }
+      >
+        {/* controls sit above the board so they never overlap columns */}
+        <div className="mb-3 hidden items-center md:flex">
+          {fullscreen && <span className="label-caps text-muted">Esc exits full screen</span>}
+          <div className="ml-auto flex">
+            {canScroll && (
+              <>
+                <button
+                  onClick={() => nudge(-1)}
+                  disabled={!overflow.left}
+                  aria-label="Scroll columns left"
+                  className="flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors enabled:hover:bg-ink enabled:hover:text-bg disabled:border-soft disabled:text-muted/40"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => nudge(1)}
+                  disabled={!overflow.right}
+                  aria-label="Scroll columns right"
+                  className="-ml-[1.5px] flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors enabled:hover:bg-ink enabled:hover:text-bg disabled:border-soft disabled:text-muted/40"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setFullscreen((v) => !v)}
+              aria-label={fullscreen ? "Exit full screen" : "View board full screen"}
+              title={fullscreen ? "Exit full screen (Esc)" : "Full screen"}
+              className={`flex h-8 w-9 items-center justify-center border-[1.5px] border-line text-muted transition-colors hover:bg-ink hover:text-bg ${
+                canScroll ? "-ml-[1.5px]" : ""
+              }`}
+            >
+              {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+          </div>
         </div>
-      )}
 
-      <div className="relative">
-        <div
-          ref={scrollerRef}
-          onScroll={updateOverflow}
-          className="flex snap-x snap-proximity gap-5 overflow-x-auto pb-4"
-        >
-          {columns.map(({ wordType, cards: columnCards }) => (
-            <KanbanColumn
-              key={wordType}
-              wordType={wordType}
-              cards={columnCards}
-              deckId={deckId}
-              onOpen={openCard}
-            />
-          ))}
+        <div className={`relative ${fullscreen ? "min-h-0 flex-1" : ""}`}>
+          <div
+            ref={scrollerRef}
+            onScroll={updateOverflow}
+            className={`flex snap-x snap-proximity gap-5 overflow-x-auto pb-4 ${
+              fullscreen ? "h-full items-start overflow-y-auto" : ""
+            }`}
+          >
+            {columns.map(({ wordType, cards: columnCards }) => (
+              <KanbanColumn
+                key={wordType}
+                wordType={wordType}
+                cards={columnCards}
+                deckId={deckId}
+                onOpen={openCard}
+              />
+            ))}
+          </div>
+
+          {/* edge fades hint at horizontally clipped columns */}
+          {overflow.left && (
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg to-transparent" />
+          )}
+          {overflow.right && (
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent" />
+          )}
         </div>
-
-        {/* edge fades hint at horizontally clipped columns */}
-        {overflow.left && (
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-bg to-transparent" />
-        )}
-        {overflow.right && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent" />
-        )}
       </div>
       <DragOverlay>{active && <KanbanCard card={active} overlay />}</DragOverlay>
     </DndContext>

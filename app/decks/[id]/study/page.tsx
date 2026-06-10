@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { StudySession } from "@/components/study/StudySession";
 import { prisma } from "@/lib/db";
@@ -5,6 +6,8 @@ import {
   interleaveQueue,
   MAX_NEW_PER_SESSION,
   MAX_SESSION_SIZE,
+  parseStudyExclude,
+  STUDY_EXCLUDE_COOKIE,
   type StudyCard,
 } from "@/lib/study";
 import type { CardType, Gender, WordType } from "@/lib/types";
@@ -108,9 +111,13 @@ export default async function StudyPage({
 
   const now = new Date();
 
+  // settings can exclude word types from study (cookie-backed preference)
+  const studyExclude = parseStudyExclude((await cookies()).get(STUDY_EXCLUDE_COOKIE)?.value);
+  const exclude = studyExclude.length ? { wordType: { notIn: studyExclude } } : {};
+
   // Reviewed cards that are due (learning + review states)
   const dueCards = await prisma.card.findMany({
-    where: { deckId: id, due: { lte: now }, state: { not: 0 }, masteredAt: null },
+    where: { deckId: id, due: { lte: now }, state: { not: 0 }, masteredAt: null, ...exclude },
     orderBy: { due: "asc" },
     select: STUDY_SELECT,
     take: MAX_SESSION_SIZE,
@@ -124,7 +131,7 @@ export default async function StudyPage({
   const newCards =
     newBudget > 0
       ? await prisma.card.findMany({
-          where: { deckId: id, state: 0, masteredAt: null },
+          where: { deckId: id, state: 0, masteredAt: null, ...exclude },
           orderBy: { createdAt: "asc" },
           select: STUDY_SELECT,
           take: newBudget,

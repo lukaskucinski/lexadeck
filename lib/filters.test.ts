@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectedSet, toggleValue } from "./filters";
+import { checkedCount, selectedSet, toggleAll, toggleValue } from "./filters";
 
 const ALL = ["a", "b", "c"] as const;
 
@@ -36,5 +36,33 @@ describe("toggleValue", () => {
 
   it("keeps option order canonical regardless of toggle order", () => {
     expect(toggleValue("c", "a", ALL)).toBe("a,c");
+  });
+});
+
+describe("toggleAll (group-title click)", () => {
+  it("unchecks a facet that is fully checked by default", () => {
+    expect(toggleAll(null, ALL)).toBe("none");
+  });
+
+  it("checks everything from the all-unchecked state", () => {
+    expect(toggleAll("none", ALL)).toBeNull();
+  });
+
+  it("checks everything from a partial subset", () => {
+    expect(toggleAll("a,c", ALL)).toBeNull();
+  });
+});
+
+describe("checkedCount (filter badge)", () => {
+  it("an untouched facet contributes nothing", () => {
+    expect(checkedCount(null, ALL)).toBe(0);
+  });
+
+  it("an all-unchecked facet contributes nothing", () => {
+    expect(checkedCount("none", ALL)).toBe(0);
+  });
+
+  it("counts the checked subset", () => {
+    expect(checkedCount("a,c", ALL)).toBe(2);
   });
 });

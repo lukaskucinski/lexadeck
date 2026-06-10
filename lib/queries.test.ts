@@ -38,14 +38,20 @@ describe("buildCardWhere", () => {
     expect(where.wordType).toEqual({ in: ["NOUN"] });
   });
 
-  it("an all-unchecked facet matches nothing", () => {
-    const where = buildCardWhere({ wordTypes: [] });
-    expect(where.wordType).toEqual({ in: [] });
+  // "Uncheck all" leaves every facet at "none"; a facet the user hasn't
+  // rebuilt yet must not blank the whole view (board bug: Noun + Masculine
+  // showed nothing because SRS state was still all-unchecked)
+  it("an all-unchecked facet adds no constraint", () => {
+    expect(buildCardWhere({ wordTypes: [] })).toEqual({});
+    expect(buildCardWhere({ srs: [] })).toEqual({});
+    expect(buildCardWhere({ hasTranslation: "none" })).toEqual({});
   });
 
-  it("an all-unchecked SRS facet matches nothing", () => {
-    const where = buildCardWhere({ srs: [] });
-    expect(where.AND).toEqual([{ id: { in: [] } }]);
+  it("subsets still apply when other facets are all-unchecked", () => {
+    const where = buildCardWhere({ wordTypes: ["NOUN"], genders: ["MASCULINE"], srs: [] });
+    expect(where.wordType).toEqual({ in: ["NOUN"] });
+    expect(where.gender).toEqual({ in: ["MASCULINE"] });
+    expect(where.AND).toBeUndefined();
   });
 
   it("SRS states combine as an OR of state conditions", () => {
@@ -53,11 +59,6 @@ describe("buildCardWhere", () => {
     const and = where.AND as { OR: unknown[] }[];
     expect(and).toHaveLength(1);
     expect(and[0].OR).toHaveLength(2);
-  });
-
-  it('hasTranslation "none" matches nothing', () => {
-    const where = buildCardWhere({ hasTranslation: "none" });
-    expect(where.id).toEqual({ in: [] });
   });
 
   it("hasTranslation true/false map to null checks", () => {
