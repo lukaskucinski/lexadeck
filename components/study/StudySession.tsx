@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { endSession, startSession, submitReview } from "@/lib/actions/study";
-import { Rating, type Grade } from "@/lib/srs";
+import { formatDueIn, previewIntervals, Rating, type Grade } from "@/lib/srs";
 import { REQUEUE_WINDOW_MS, type StudyCard } from "@/lib/study";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { FlashCard } from "./FlashCard";
@@ -52,6 +53,7 @@ export function StudySession({
   dueCount: number;
   newCount: number;
 }) {
+  const router = useRouter();
   const [phase, setPhase] = useState<"preview" | "active" | "done">("preview");
   const [queue, setQueue] = useState<QueueItem[]>(() =>
     cards.map((card) => ({ card, dueAt: 0, pass: 0 })),
@@ -100,14 +102,14 @@ export function StudySession({
 
       (sessionPromiseRef.current ?? Promise.resolve(null))
         .then((sessionId) => submitReview(sessionId, card.id, rating))
-        .then(({ dueInMs }) => {
+        .then(({ dueInMs, fields }) => {
           if (dueInMs <= REQUEUE_WINDOW_MS) {
             const dueAt = Date.now() + Math.max(0, dueInMs);
             setQueue((prev) => {
               const next = [
                 ...prev,
                 {
-                  card: { ...card, isNew: false, reps: card.reps + 1 },
+                  card: { ...card, isNew: false, srs: fields },
                   dueAt,
                   pass: pass + 1,
                 },
@@ -235,9 +237,14 @@ export function StudySession({
         </div>
 
         <div className="mt-6 flex gap-3">
-          <ButtonLink href={`/decks/${deckId}/study`} variant="outline">
+          {/* fresh ?s= remounts the keyed session — a link to the bare route
+              would keep this component (and its "done" phase) alive */}
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/decks/${deckId}/study?s=${Date.now()}`)}
+          >
             Study more
-          </ButtonLink>
+          </Button>
           <ButtonLink href={`/decks/${deckId}`}>Back to deck →</ButtonLink>
         </div>
       </div>
@@ -247,6 +254,20 @@ export function StudySession({
   /* ---------- active ---------- */
   const total = done + queue.length;
   const progress = total > 0 ? done / total : 0;
+  // what each rating would do to the current card — re-queues make these
+  // intra-session values ("<10m") rather than always days
+  const hints =
+    current && revealed
+      ? (() => {
+          const ms = previewIntervals(current.card.srs);
+          return {
+            [Rating.Again]: formatDueIn(ms[Rating.Again]),
+            [Rating.Hard]: formatDueIn(ms[Rating.Hard]),
+            [Rating.Good]: formatDueIn(ms[Rating.Good]),
+            [Rating.Easy]: formatDueIn(ms[Rating.Easy]),
+          };
+        })()
+      : undefined;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-6">
@@ -261,8 +282,8 @@ export function StudySession({
             style={{ width: `${progress * 100}%` }}
           />
         </div>
-        <span className="tnum text-[0.78rem] font-bold">
-          {done}/{total}
+        <span className="tnum text-[0.78rem] font-bold whitespace-nowrap">
+          {done} done · {queue.length} left
         </span>
       </div>
 
@@ -298,7 +319,7 @@ export function StudySession({
 
       <div className="pb-2">
         {revealed ? (
-          <ReviewButtons onRate={rate} />
+          <ReviewButtons onRate={rate} hints={hints} />
         ) : (
           <button
             onClick={() => setRevealed(true)}

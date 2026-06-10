@@ -7,7 +7,7 @@ import {
   MAX_SESSION_SIZE,
   type StudyCard,
 } from "@/lib/study";
-import type { Gender, WordType } from "@/lib/types";
+import type { CardType, Gender, WordType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,7 @@ const STUDY_SELECT = {
   id: true,
   term: true,
   translation: true,
+  cardType: true,
   wordType: true,
   gender: true,
   emoji: true,
@@ -23,15 +24,24 @@ const STUDY_SELECT = {
   notes: true,
   conjugation: true,
   language: true,
-  reps: true,
+  // full FSRS slice — the client previews next intervals per rating
+  due: true,
   stability: true,
+  difficulty: true,
+  elapsedDays: true,
+  scheduledDays: true,
+  learningSteps: true,
+  reps: true,
+  lapses: true,
   state: true,
+  lastReview: true,
 } as const;
 
 interface StudyRow {
   id: string;
   term: string;
   translation: string | null;
+  cardType: string;
   wordType: string;
   gender: string | null;
   emoji: string | null;
@@ -40,9 +50,16 @@ interface StudyRow {
   notes: string | null;
   conjugation: string | null;
   language: string;
-  reps: number;
+  due: Date;
   stability: number;
+  difficulty: number;
+  elapsedDays: number;
+  scheduledDays: number;
+  learningSteps: number;
+  reps: number;
+  lapses: number;
   state: number;
+  lastReview: Date | null;
 }
 
 function toStudyCard(row: StudyRow): StudyCard {
@@ -50,6 +67,7 @@ function toStudyCard(row: StudyRow): StudyCard {
     id: row.id,
     term: row.term,
     translation: row.translation,
+    cardType: row.cardType as CardType,
     wordType: row.wordType as WordType,
     gender: row.gender as Gender | null,
     emoji: row.emoji,
@@ -58,18 +76,33 @@ function toStudyCard(row: StudyRow): StudyCard {
     notes: row.notes,
     conjugation: row.conjugation,
     language: row.language,
-    reps: row.reps,
-    stability: row.stability,
     isNew: row.state === 0,
+    srs: {
+      due: row.due,
+      stability: row.stability,
+      difficulty: row.difficulty,
+      elapsedDays: row.elapsedDays,
+      scheduledDays: row.scheduledDays,
+      learningSteps: row.learningSteps,
+      reps: row.reps,
+      lapses: row.lapses,
+      state: row.state,
+      lastReview: row.lastReview,
+    },
   };
 }
 
 export default async function StudyPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  // "Study more" links back here with a fresh ?s= value; keying the session on
+  // it remounts the client component out of its "done" phase (board bug).
+  const sessionKey = typeof sp.s === "string" ? sp.s : "initial";
   const deck = await prisma.deck.findUnique({ where: { id } });
   if (!deck) notFound();
 
@@ -106,6 +139,7 @@ export default async function StudyPage({
 
   return (
     <StudySession
+      key={sessionKey}
       deckId={id}
       deckName={deck.name}
       cards={queue}

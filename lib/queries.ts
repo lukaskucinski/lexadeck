@@ -1,6 +1,7 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "./db";
 import { MASTERED_STABILITY_DAYS } from "./srs";
+import { sessionCounts, type SessionCounts } from "./study";
 import type { CardType, Gender, SRSState, WordType } from "./types";
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +86,22 @@ export function cardOrderBy(
     default:
       return [{ createdAt: dir }];
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Study session sizing                                                */
+/* ------------------------------------------------------------------ */
+
+/** Honest "Study (N)" badge: what a session started now would contain. */
+export async function getStudySessionCounts(
+  deckId: string,
+  now: Date = new Date(),
+): Promise<SessionCounts> {
+  const [due, fresh] = await Promise.all([
+    prisma.card.count({ where: { deckId, due: { lte: now }, state: { not: 0 } } }),
+    prisma.card.count({ where: { deckId, state: 0 } }),
+  ]);
+  return sessionCounts(due, fresh);
 }
 
 /* ------------------------------------------------------------------ */

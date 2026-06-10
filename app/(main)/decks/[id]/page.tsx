@@ -12,7 +12,12 @@ import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/db";
-import { buildCardWhere, cardOrderBy, parseCardViewParams } from "@/lib/queries";
+import {
+  buildCardWhere,
+  cardOrderBy,
+  getStudySessionCounts,
+  parseCardViewParams,
+} from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +52,10 @@ export default async function DeckDetailPage({
   if (!deck) notFound();
 
   const where = { deckId: id, ...buildCardWhere(vp.filters, now) };
-  const [total, ready] = await Promise.all([
+  const [total, ready, session] = await Promise.all([
     prisma.card.count({ where: { deckId: id } }),
     prisma.card.count({ where: { deckId: id, due: { lte: now } } }),
+    getStudySessionCounts(id, now),
   ]);
 
   let content: React.ReactNode;
@@ -125,7 +131,7 @@ export default async function DeckDetailPage({
               + Card
             </ButtonLink>
             <ButtonLink href={`/decks/${id}/study`} variant="primary">
-              Study {ready > 0 ? `(${Math.min(ready, 50)})` : ""} →
+              Study {session.total > 0 ? `(${session.total})` : ""} →
             </ButtonLink>
           </div>
         </div>

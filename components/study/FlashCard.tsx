@@ -28,7 +28,9 @@ export function FlashCard({
   revealed: boolean;
   onReveal: () => void;
 }) {
-  const [notesOpen, setNotesOpen] = useState(false);
+  const isGrammar = card.cardType === "GRAMMAR";
+  // grammar cards carry their substance in notes — surface them immediately
+  const [notesOpen, setNotesOpen] = useState(isGrammar);
   const accent = wordTypeVar(card.wordType);
 
   return (
@@ -66,10 +68,10 @@ export function FlashCard({
 
           <div className="grid grid-cols-2 border-t border-line text-[0.62rem] font-semibold tracking-[0.1em] text-muted uppercase">
             <div className="tnum border-r border-soft px-5 py-2.5">
-              <b className="text-ink">{card.reps}</b> reviews
+              <b className="text-ink">{card.srs.reps}</b> reviews
             </div>
             <div className="tnum px-5 py-2.5">
-              <b className="text-ink">{card.stability.toFixed(1)}d</b> stability
+              <b className="text-ink">{card.srs.stability.toFixed(1)}d</b> stability
             </div>
           </div>
         </div>
@@ -90,9 +92,13 @@ export function FlashCard({
           </div>
 
           <div className="flex-1 px-7 py-6">
-            <p className="text-3xl font-medium tracking-tight md:text-4xl">
-              {card.translation ?? <span className="text-muted/60">no translation yet</span>}
-            </p>
+            {/* grammar cards legitimately have no translation — only word
+                cards show the missing-translation placeholder */}
+            {(card.translation || !isGrammar) && (
+              <p className="text-3xl font-medium tracking-tight md:text-4xl">
+                {card.translation ?? <span className="text-muted/60">no translation yet</span>}
+              </p>
+            )}
 
             {(card.example || card.exampleEn) && (
               <div className="mt-6 border-l-2 border-line pl-4">

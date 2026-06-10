@@ -1,4 +1,5 @@
-import type { Gender, WordType } from "./types";
+import type { SchedulerFields } from "./srs";
+import type { CardType, Gender, WordType } from "./types";
 
 export const MAX_SESSION_SIZE = 50;
 export const MAX_NEW_PER_SESSION = 10;
@@ -10,6 +11,7 @@ export interface StudyCard {
   id: string;
   term: string;
   translation: string | null;
+  cardType: CardType;
   wordType: WordType;
   gender: Gender | null;
   emoji: string | null;
@@ -18,9 +20,29 @@ export interface StudyCard {
   notes: string | null;
   conjugation: string | null;
   language: string;
-  reps: number;
-  stability: number;
   isNew: boolean;
+  srs: SchedulerFields;
+}
+
+export interface SessionCounts {
+  due: number;
+  fresh: number;
+  total: number;
+}
+
+/**
+ * What a session started right now would actually contain — the same caps the
+ * queue builder applies. Keeps "Study (N)" badges honest (board item: badge
+ * said 50, session gave 10).
+ */
+export function sessionCounts(dueCount: number, newCount: number): SessionCounts {
+  const due = Math.min(dueCount, MAX_SESSION_SIZE);
+  const fresh = Math.min(
+    newCount,
+    MAX_NEW_PER_SESSION,
+    Math.max(0, MAX_SESSION_SIZE - due),
+  );
+  return { due, fresh, total: due + fresh };
 }
 
 /**
