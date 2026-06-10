@@ -27,16 +27,18 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    /* grid (not flex): flex-1 items still differ by label min-content width,
-       so the six slots looked unevenly spread (board item) */
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t-[1.5px] border-line bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
+    /* equal GAPS, not equal slots: labels vary in width, so centering them in
+       identical cells reads as uneven (LIBRARY/PROGRESS nearly touch while
+       HOME/DECKS sit far apart). justify-evenly spaces the natural-width
+       items with identical whitespace between every pair and at the edges. */
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-evenly border-t-[1.5px] border-line bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link
             key={href}
             href={href}
-            className={`flex min-w-0 flex-col items-center gap-0.5 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
+            className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
               active ? "text-ink" : "text-muted"
             }`}
           >
