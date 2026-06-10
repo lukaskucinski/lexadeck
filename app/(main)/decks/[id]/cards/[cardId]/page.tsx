@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Sparkles } from "lucide-react";
 import { CardStatusActions } from "@/components/card/CardStatusActions";
+import { EnrichButton } from "@/components/card/EnrichButton";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { prisma } from "@/lib/db";
@@ -108,13 +108,9 @@ export default async function CardDetailPage({
           Edit card
         </ButtonLink>
         <CardStatusActions cardId={cardId} srs={srs} />
-        {/* v2 AI affordance — reserved per spec */}
-        <span
-          title="AI enrich — coming in v2"
-          className="label-caps inline-flex h-10 cursor-not-allowed items-center gap-2 border-[1.5px] border-soft px-4 text-muted/50"
-        >
-          <Sparkles size={14} /> AI enrich
-        </span>
+        {card.wordType !== "GRAMMAR" && (
+          <EnrichButton cardId={cardId} enriched={card.enrichedAt != null} />
+        )}
         <span
           className="ml-auto h-3 w-3"
           style={{ background: wordTypeVar(card.wordType as WordType) }}

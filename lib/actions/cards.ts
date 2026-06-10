@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { geminiEnrich, translateBatch } from "@/lib/ai/enrichment";
 import { prisma } from "@/lib/db";
 import { emptySchedulerFields } from "@/lib/srs";
 import { CardType, Gender, WordType } from "@/lib/types";
@@ -129,6 +130,54 @@ export async function setCardWordType(
   if (wordType !== "NOUN") data.gender = null;
   const card = await prisma.card.update({ where: { id: cardId }, data });
   revalidateCardPaths(card.deckId);
+}
+
+/**
+ * In-app AI enrichment for a single card: fills a missing translation
+ * (Azure Translator) and generates example/exampleEn/emoji (Gemini).
+ */
+export async function enrichCard(cardId: string): Promise<{ error?: string }> {
+  const card = await prisma.card.findUnique({ where: { id: cardId } });
+  if (!card) return { error: "Card not found" };
+  if (card.wordType === "GRAMMAR") {
+    return { error: "Grammar cards aren't auto-enriched" };
+  }
+
+  try {
+    let translation = card.translation;
+    if (!translation) {
+      const { out } = await translateBatch([card.term]);
+      translation = out[0]?.trim() || null;
+    }
+
+    const [item] = await geminiEnrich([
+      {
+        id: card.id,
+        term: card.term,
+        translation,
+        wordType: card.wordType,
+        gender: card.gender,
+        notes: card.notes,
+      },
+    ]);
+    if (!item) return { error: "The AI returned no enrichment for this card" };
+
+    await prisma.card.update({
+      where: { id: cardId },
+      data: {
+        translation,
+        example: item.example.trim() || card.example,
+        exampleEn: item.exampleEn.trim() || card.exampleEn,
+        emoji: item.emoji.trim() || card.emoji,
+        enrichedAt: new Date(),
+      },
+    });
+    revalidateCardPaths(card.deckId);
+    revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
+    return {};
+  } catch (err) {
+    return { error: (err as Error).message.slice(0, 200) };
+  }
 }
 
 /** Manual mastery: a mastered card never enters study sessions. */
