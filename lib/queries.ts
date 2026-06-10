@@ -39,9 +39,12 @@ export function srsStateWhere(state: SRSState, now: Date = new Date()): Prisma.C
 /* ------------------------------------------------------------------ */
 
 /**
- * For the array facets: undefined = no constraint (everything shown), an
- * empty array = the user unchecked every option ("none" in the URL) and
- * nothing should match. hasTranslation works the same way via "none".
+ * For the array facets: a value subset constrains with `in`; undefined (facet
+ * untouched) and an empty array ("none" in the URL — every box unchecked) both
+ * add no constraint. The empty facet is a blank slate the user builds a
+ * selection from after "Uncheck all"; if it filtered, any facet they hadn't
+ * rebuilt yet would blank the whole view. hasTranslation mirrors this: "none"
+ * is neutral.
  */
 export interface CardFilters {
   q?: string;
@@ -53,21 +56,17 @@ export interface CardFilters {
   deckIds?: string[];
 }
 
-const MATCH_NOTHING: Prisma.CardWhereInput = { id: { in: [] } };
-
 export type CardSort = "term" | "createdAt" | "due" | "wordType";
 
 export function buildCardWhere(filters: CardFilters, now: Date = new Date()): Prisma.CardWhereInput {
   const where: Prisma.CardWhereInput = {};
 
-  // `{ in: [] }` matches no rows, which is exactly what an all-unchecked facet means
-  if (filters.deckIds) where.deckId = { in: filters.deckIds };
-  if (filters.wordTypes) where.wordType = { in: filters.wordTypes };
-  if (filters.genders) where.gender = { in: filters.genders };
-  if (filters.cardTypes) where.cardType = { in: filters.cardTypes };
+  if (filters.deckIds?.length) where.deckId = { in: filters.deckIds };
+  if (filters.wordTypes?.length) where.wordType = { in: filters.wordTypes };
+  if (filters.genders?.length) where.gender = { in: filters.genders };
+  if (filters.cardTypes?.length) where.cardType = { in: filters.cardTypes };
   if (filters.hasTranslation === true) where.translation = { not: null };
   if (filters.hasTranslation === false) where.translation = null;
-  if (filters.hasTranslation === "none") where.id = MATCH_NOTHING.id;
 
   if (filters.q) {
     where.OR = [
@@ -76,10 +75,8 @@ export function buildCardWhere(filters: CardFilters, now: Date = new Date()): Pr
     ];
   }
 
-  if (filters.srs) {
-    where.AND = filters.srs.length
-      ? [{ OR: filters.srs.map((s) => srsStateWhere(s, now)) }]
-      : [MATCH_NOTHING];
+  if (filters.srs?.length) {
+    where.AND = [{ OR: filters.srs.map((s) => srsStateWhere(s, now)) }];
   }
 
   return where;
@@ -109,12 +106,16 @@ export function cardOrderBy(
 export async function getStudySessionCounts(
   deckId: string,
   now: Date = new Date(),
+  excludeWordTypes: WordType[] = [],
 ): Promise<SessionCounts> {
+  const exclude = excludeWordTypes.length
+    ? { wordType: { notIn: excludeWordTypes } }
+    : {};
   const [due, fresh] = await Promise.all([
     prisma.card.count({
-      where: { deckId, due: { lte: now }, state: { not: 0 }, masteredAt: null },
+      where: { deckId, due: { lte: now }, state: { not: 0 }, masteredAt: null, ...exclude },
     }),
-    prisma.card.count({ where: { deckId, state: 0, masteredAt: null } }),
+    prisma.card.count({ where: { deckId, state: 0, masteredAt: null, ...exclude } }),
   ]);
   return sessionCounts(due, fresh);
 }

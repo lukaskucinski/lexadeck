@@ -6,11 +6,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { setCardMastered } from "@/lib/actions/cards";
 import { endSession, startSession, submitReview } from "@/lib/actions/study";
+import { playEffect } from "@/lib/sound";
 import { formatDueIn, previewIntervals, Rating, type Grade } from "@/lib/srs";
 import { REQUEUE_WINDOW_MS, type StudyCard } from "@/lib/study";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { FlashCard } from "./FlashCard";
 import { ReviewButtons } from "./ReviewButtons";
+import { SoundToggle } from "./SoundToggle";
 
 interface QueueItem {
   card: StudyCard;
@@ -103,6 +105,7 @@ export function StudySession({
   }, [deckId]);
 
   const finish = useCallback(async () => {
+    playEffect("complete");
     setPhase("done");
     const sessionId = await sessionPromiseRef.current;
     if (sessionId) await endSession(sessionId, studied.size);
@@ -116,6 +119,7 @@ export function StudySession({
       setExitDir(rating >= Rating.Good ? 1 : -1);
       setWash(WASH_COLOR[rating]);
       setTimeout(() => setWash(null), 220);
+      playEffect(RATING_KEY[rating]);
 
       // tallies record each card's FIRST rating only (pass 0 = first
       // appearance), so they sum to cards studied; `done` counts every review
@@ -163,6 +167,7 @@ export function StudySession({
     setExitDir(1);
     setWash(WASH_COLOR[Rating.Easy]);
     setTimeout(() => setWash(null), 220);
+    playEffect("mastered");
     setRevealed(false);
     setQueue((prev) => prev.filter((item) => item.card.id !== card.id));
     setCardMastered(card.id, true).catch((err) => console.error("master failed:", err));
@@ -368,6 +373,7 @@ export function StudySession({
         <span className="tnum text-[0.78rem] font-bold whitespace-nowrap">
           {done} done · {queue.length} left
         </span>
+        <SoundToggle />
       </div>
 
       <div className="relative flex flex-1 flex-col justify-center py-8">

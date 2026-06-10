@@ -15,6 +15,11 @@ export type { Grade };
 /** Stability (in days) at or above which a Review-state card counts as mastered. */
 export const MASTERED_STABILITY_DAYS = 21;
 
+/** Plain-language tooltip for the stability figures shown in the UI. */
+export const STABILITY_HINT =
+  `FSRS stability — roughly how many days until your chance of recalling this card drops to 90%. ` +
+  `Higher means stronger memory; ${MASTERED_STABILITY_DAYS}d or more counts as mastered.`;
+
 /**
  * The FSRS slice of a Card row. Matches prisma/schema.prisma field names;
  * pure-object friendly so scripts and tests can use it without Prisma.

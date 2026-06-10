@@ -2,6 +2,7 @@
 
 import { Volume2 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { pickVoice } from "@/lib/speech";
 
 const noopSubscribe = () => () => {};
 
@@ -12,24 +13,6 @@ function useSpeechSupported(): boolean {
     () => "speechSynthesis" in window,
     () => false,
   );
-}
-
-/**
- * Prefer the major Spanish variants (local voices first — they sound best
- * and work offline); otherwise first voice matching the language prefix.
- */
-function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
-  const prefix = lang.toLowerCase();
-  const matches = window.speechSynthesis
-    .getVoices()
-    .filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith(prefix));
-  if (matches.length === 0) return undefined;
-
-  for (const target of ["es-es", "es-mx", "es-us"]) {
-    const subset = matches.filter((v) => v.lang.toLowerCase().replace("_", "-") === target);
-    if (subset.length) return subset.find((v) => v.localService) ?? subset[0];
-  }
-  return matches.find((v) => v.localService) ?? matches[0];
 }
 
 export function SpeakButton({
@@ -70,7 +53,7 @@ export function SpeakButton({
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    const voice = pickVoice(lang);
+    const voice = pickVoice(synth.getVoices(), lang);
     if (voice) utterance.voice = voice;
     utterance.lang = voice?.lang ?? (lang === "es" ? "es-ES" : lang);
     utterance.rate = 0.95;

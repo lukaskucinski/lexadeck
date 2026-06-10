@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   getStudySessionCounts,
   parseCardViewParams,
 } from "@/lib/queries";
+import { parseStudyExclude, STUDY_EXCLUDE_COOKIE } from "@/lib/study";
 
 export const dynamic = "force-dynamic";
 
@@ -52,11 +54,12 @@ export default async function DeckDetailPage({
   const deck = await prisma.deck.findUnique({ where: { id } });
   if (!deck) notFound();
 
+  const studyExclude = parseStudyExclude((await cookies()).get(STUDY_EXCLUDE_COOKIE)?.value);
   const where = { deckId: id, ...buildCardWhere(vp.filters, now) };
   const [total, ready, session] = await Promise.all([
     prisma.card.count({ where: { deckId: id } }),
     prisma.card.count({ where: { deckId: id, due: { lte: now }, masteredAt: null } }),
-    getStudySessionCounts(id, now),
+    getStudySessionCounts(id, now, studyExclude),
   ]);
 
   let content: React.ReactNode;

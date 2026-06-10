@@ -2,7 +2,7 @@
 
 import { SlidersHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { selectedSet, toggleValue } from "@/lib/filters";
+import { checkedCount, selectedSet, toggleAll, toggleValue } from "@/lib/filters";
 import {
   CardType,
   Gender,
@@ -46,6 +46,30 @@ function CheckRow({
   );
 }
 
+/** Facet heading — clicking it flips the whole group all-checked ↔ all-unchecked. */
+function GroupTitle({
+  label,
+  current,
+  all,
+  onChange,
+}: {
+  label: string;
+  current: string | null;
+  all: readonly string[];
+  onChange: (value: string | null) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(toggleAll(current, all))}
+      title="Toggle the whole group"
+      className="label-caps mb-2 block cursor-pointer text-muted transition-colors hover:text-ink"
+    >
+      {label}
+    </button>
+  );
+}
+
 const WORD_TYPE_VALUES = Object.values(WordType);
 const SRS_VALUES = Object.keys(SRS_STATE_LABELS) as SRSState[];
 const GENDER_VALUES = Object.values(Gender);
@@ -67,8 +91,19 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
   const showDecks = !!decks && decks.length > 1;
   const deckIds = (decks ?? []).map((d) => d.id);
 
-  const activeCount =
-    [types, genders, srs, ct, ht, deckSel].filter(Boolean).length;
+  const facets: Array<[string | null, readonly string[]]> = [
+    [types, WORD_TYPE_VALUES],
+    [genders, GENDER_VALUES],
+    [srs, SRS_VALUES],
+    [ct, CARD_TYPE_VALUES],
+    [ht, HT_VALUES],
+  ];
+  if (showDecks) facets.push([deckSel, deckIds]);
+
+  // any facet touched at all (drives highlight + reset); the badge counts the
+  // individual checked toggles doing the narrowing — all-unchecked shows none
+  const filtered = facets.some(([param]) => param != null);
+  const badgeCount = facets.reduce((sum, [param, all]) => sum + checkedCount(param, all), 0);
 
   // clicking off the panel (or Escape) dismisses it
   useEffect(() => {
@@ -112,18 +147,23 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
       <button
         onClick={() => setOpen((v) => !v)}
         className={`flex h-9 items-center gap-2 border-[1.5px] border-line px-3.5 text-[0.68rem] font-extrabold tracking-[0.12em] uppercase transition-colors ${
-          open || activeCount > 0 ? "bg-ink text-bg" : "text-muted hover:text-ink"
+          open || filtered ? "bg-ink text-bg" : "text-muted hover:text-ink"
         }`}
       >
         <SlidersHorizontal size={14} />
-        Filter{activeCount > 0 ? ` · ${activeCount}` : ""}
+        Filter{filtered && badgeCount > 0 ? ` · ${badgeCount}` : ""}
       </button>
 
       {open && (
         <div className="absolute right-0 z-30 mt-2 w-[620px] max-w-[88vw] border-[1.5px] border-line bg-bg p-5 shadow-[6px_6px_0_0_var(--c-soft)]">
           <div className="grid grid-cols-2 gap-x-8 gap-y-5 md:grid-cols-3">
             <div>
-              <p className="label-caps mb-2 text-muted">Word type</p>
+              <GroupTitle
+                label="Word type"
+                current={types}
+                all={WORD_TYPE_VALUES}
+                onChange={(v) => setParams({ types: v })}
+              />
               {WORD_TYPE_VALUES.map((wt) => (
                 <CheckRow
                   key={wt}
@@ -137,7 +177,12 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
 
             <div className="space-y-5">
               <div>
-                <p className="label-caps mb-2 text-muted">SRS state</p>
+                <GroupTitle
+                  label="SRS state"
+                  current={srs}
+                  all={SRS_VALUES}
+                  onChange={(v) => setParams({ srs: v })}
+                />
                 {SRS_VALUES.map((s) => (
                   <CheckRow
                     key={s}
@@ -149,7 +194,12 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
                 ))}
               </div>
               <div>
-                <p className="label-caps mb-2 text-muted">Gender</p>
+                <GroupTitle
+                  label="Gender"
+                  current={genders}
+                  all={GENDER_VALUES}
+                  onChange={(v) => setParams({ genders: v })}
+                />
                 {GENDER_VALUES.map((g) => (
                   <CheckRow
                     key={g}
@@ -163,7 +213,12 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
 
             <div className="space-y-5">
               <div>
-                <p className="label-caps mb-2 text-muted">Card type</p>
+                <GroupTitle
+                  label="Card type"
+                  current={ct}
+                  all={CARD_TYPE_VALUES}
+                  onChange={(v) => setParams({ ct: v })}
+                />
                 {CARD_TYPE_VALUES.map((c) => (
                   <CheckRow
                     key={c}
@@ -174,7 +229,12 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
                 ))}
               </div>
               <div>
-                <p className="label-caps mb-2 text-muted">Translation</p>
+                <GroupTitle
+                  label="Translation"
+                  current={ht}
+                  all={HT_VALUES}
+                  onChange={(v) => setParams({ ht: v })}
+                />
                 <CheckRow
                   checked={checkedIn(ht, "yes", HT_VALUES)}
                   onToggle={() => setParams({ ht: toggleValue(ht, "yes", HT_VALUES) })}
@@ -188,7 +248,12 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
               </div>
               {showDecks && (
                 <div>
-                  <p className="label-caps mb-2 text-muted">Deck</p>
+                  <GroupTitle
+                    label="Deck"
+                    current={deckSel}
+                    all={deckIds}
+                    onChange={(v) => setParams({ decks: v })}
+                  />
                   {decks!.map((d) => (
                     <CheckRow
                       key={d.id}
@@ -206,7 +271,7 @@ export function FilterPanel({ decks }: { decks?: DeckOption[] }) {
             <button onClick={uncheckAll} className="label-caps text-muted hover:text-ink">
               Uncheck all
             </button>
-            {activeCount > 0 && (
+            {filtered && (
               <button onClick={resetAll} className="label-caps text-coral">
                 Reset filters
               </button>

@@ -10,6 +10,7 @@ import {
   interleaveQueue,
   MAX_NEW_PER_SESSION,
   MAX_SESSION_SIZE,
+  parseStudyExclude,
   sessionCounts,
 } from "./study";
 
@@ -84,6 +85,25 @@ describe("manual mastered override", () => {
     expect(
       getSRSState({ state: 2, due: now, stability: 5, masteredAt: now }, now),
     ).toBe("mastered");
+  });
+});
+
+describe("parseStudyExclude", () => {
+  it("missing cookie means no exclusions", () => {
+    expect(parseStudyExclude(undefined)).toEqual([]);
+    expect(parseStudyExclude("")).toEqual([]);
+  });
+
+  it("parses a CSV of word types", () => {
+    expect(parseStudyExclude("GRAMMAR,EXPRESSION")).toEqual(["GRAMMAR", "EXPRESSION"]);
+  });
+
+  it("drops unknown values and duplicates", () => {
+    expect(parseStudyExclude("GRAMMAR,BOGUS,GRAMMAR")).toEqual(["GRAMMAR"]);
+  });
+
+  it("handles URL-encoded cookie values", () => {
+    expect(parseStudyExclude("GRAMMAR%2CVERB")).toEqual(["GRAMMAR", "VERB"]);
   });
 });
 

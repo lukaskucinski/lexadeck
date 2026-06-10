@@ -6,7 +6,7 @@ import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { prisma } from "@/lib/db";
-import { getSRSState } from "@/lib/srs";
+import { getSRSState, STABILITY_HINT } from "@/lib/srs";
 import type { Gender, WordType } from "@/lib/types";
 import { wordTypeVar } from "@/lib/wordTypeColors";
 
@@ -95,9 +95,11 @@ export default async function CardDetailPage({
             <div className="tnum text-lg font-black">{card._count.reviews}</div>
             <div className="label-caps text-muted">Reviews</div>
           </div>
-          <div className="border-soft px-4 py-3 sm:border-r">
+          <div className="cursor-help border-soft px-4 py-3 sm:border-r" title={STABILITY_HINT}>
             <div className="tnum text-lg font-black">{card.stability.toFixed(1)}d</div>
-            <div className="label-caps text-muted">Stability</div>
+            <div className="label-caps text-muted underline decoration-dotted underline-offset-2">
+              Stability
+            </div>
           </div>
           <div className="border-r border-soft px-4 py-3">
             <div className="tnum text-lg font-black">{fmtDate(card.due)}</div>

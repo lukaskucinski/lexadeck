@@ -10,7 +10,7 @@ const archivo = Archivo({
 
 export const metadata: Metadata = {
   title: "LexaDeck",
-  description: "A typographic language learning flashcard studio",
+  description: "Typographic flashcard language learning",
   manifest: "/manifest.webmanifest",
 };
 

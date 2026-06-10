@@ -1,6 +1,14 @@
+import { cookies } from "next/headers";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { MAX_NEW_PER_SESSION, MAX_SESSION_SIZE } from "@/lib/study";
+import { StudyExcludeChips } from "@/components/settings/StudyExcludeChips";
+import { SoundToggle } from "@/components/study/SoundToggle";
+import {
+  MAX_NEW_PER_SESSION,
+  MAX_SESSION_SIZE,
+  parseStudyExclude,
+  STUDY_EXCLUDE_COOKIE,
+} from "@/lib/study";
 import { MASTERED_STABILITY_DAYS } from "@/lib/srs";
 
 export const dynamic = "force-dynamic";
@@ -76,10 +84,11 @@ function ProviderDot({ configured }: { configured: boolean }) {
   );
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
   const azure = Boolean(process.env.AZURE_TRANSLATOR_KEY && process.env.AZURE_TRANSLATOR_REGION);
   const gemini = Boolean(process.env.GEMINI_API_KEY);
   const deepl = Boolean(process.env.DEEPL_API_KEY);
+  const studyExclude = parseStudyExclude((await cookies()).get(STUDY_EXCLUDE_COOKIE)?.value);
 
   return (
     <div className="max-w-2xl">
@@ -110,6 +119,15 @@ export default function SettingsPage() {
             hint="Choose es→en or en→es on the session start screen"
           >
             <StaticValue>per session</StaticValue>
+          </Row>
+          <Row
+            label="Excluded word types"
+            hint="Crossed-out types never enter study sessions — stored on this device"
+          >
+            <StudyExcludeChips initial={studyExclude} />
+          </Row>
+          <Row label="Sound effects" hint="Rating and completion sounds during study">
+            <SoundToggle size={18} />
           </Row>
         </Section>
 

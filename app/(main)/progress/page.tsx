@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Heatmap } from "@/components/ui/Heatmap";
 import { prisma } from "@/lib/db";
 import { getDeckSummaries } from "@/lib/queries";
+import { STABILITY_HINT } from "@/lib/srs";
 import { computeStreak, getReviewActivity, getSRSDistribution } from "@/lib/stats";
 import { SRS_STATE_LABELS } from "@/lib/types";
 import { srsStateVar } from "@/lib/wordTypeColors";
@@ -170,7 +171,10 @@ export default async function ProgressPage() {
                   <b className="type-term text-[0.95rem]">{card.term}</b>
                   <span className="ml-2 text-[0.78rem] text-muted">{card.translation}</span>
                 </span>
-                <span className="tnum shrink-0 text-[0.72rem] font-bold text-teal">
+                <span
+                  className="tnum shrink-0 cursor-help text-[0.72rem] font-bold text-teal underline decoration-dotted underline-offset-2"
+                  title={STABILITY_HINT}
+                >
                   {card.stability.toFixed(0)}d stability
                 </span>
               </Link>

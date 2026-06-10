@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
+import { STABILITY_HINT } from "@/lib/srs";
 import { WORD_TYPE_LABELS } from "@/lib/types";
 import type { StudyCard } from "@/lib/study";
 import { wordTypeVar } from "@/lib/wordTypeColors";
@@ -79,8 +80,9 @@ export function FlashCard({
             <div className="tnum border-r border-soft px-5 py-2.5">
               <b className="text-ink">{card.srs.reps}</b> reviews
             </div>
-            <div className="tnum px-5 py-2.5">
-              <b className="text-ink">{card.srs.stability.toFixed(1)}d</b> stability
+            <div className="tnum cursor-help px-5 py-2.5" title={STABILITY_HINT}>
+              <b className="text-ink">{card.srs.stability.toFixed(1)}d</b>{" "}
+              <span className="underline decoration-dotted underline-offset-2">stability</span>
             </div>
           </div>
         </div>
