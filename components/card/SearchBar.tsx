@@ -30,7 +30,7 @@ export function SearchBar({ placeholder = "Search term or translation" }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-44 bg-transparent text-sm font-semibold outline-none placeholder:text-muted md:w-64"
+        className="w-36 bg-transparent text-sm font-semibold outline-none placeholder:text-muted sm:w-44 md:w-64"
       />
       {value && (
         <button onClick={() => onChange("")} className="text-muted hover:text-ink">

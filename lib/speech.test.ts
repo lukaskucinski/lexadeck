@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickVoice, type VoiceLike } from "./speech";
+import { defaultLangTag, pickVoice, type VoiceLike } from "./speech";
 
 const voice = (name: string, lang: string, localService: boolean): VoiceLike => ({
   name,
@@ -26,6 +26,37 @@ describe("pickVoice — English (mechanical-voice board fix)", () => {
 
   it("falls back to the local voice when nothing better exists", () => {
     expect(pickVoice([DAVID], "en")).toBe(DAVID);
+  });
+
+  // board fix: English came out Spanish-accented — anchor on the major
+  // English variants (American, then British) before any other en-*
+  it("prefers en-US over other variants regardless of list order", () => {
+    const inGB = voice("Google UK English Female", "en-GB", false);
+    const inIN = voice("English India", "en-IN", true);
+    expect(pickVoice([inIN, inGB, GOOGLE_EN], "en")).toBe(GOOGLE_EN);
+  });
+
+  it("prefers en-GB when no en-US voice exists", () => {
+    const inGB = voice("Google UK English Female", "en-GB", false);
+    const inIN = voice("English India", "en-IN", true);
+    expect(pickVoice([inIN, inGB], "en")).toBe(inGB);
+  });
+
+  it("still ranks quality within the preferred variant", () => {
+    const inGB = voice("Google UK English Female", "en-GB", false);
+    expect(pickVoice([DAVID, inGB, ARIA_NATURAL], "en")).toBe(ARIA_NATURAL);
+  });
+});
+
+describe("defaultLangTag (no-voice fallback)", () => {
+  it("maps bare language codes to a concrete region", () => {
+    expect(defaultLangTag("en")).toBe("en-US");
+    expect(defaultLangTag("es")).toBe("es-ES");
+  });
+
+  it("passes already-regioned and unknown tags through", () => {
+    expect(defaultLangTag("en-GB")).toBe("en-GB");
+    expect(defaultLangTag("fr")).toBe("fr");
   });
 });
 

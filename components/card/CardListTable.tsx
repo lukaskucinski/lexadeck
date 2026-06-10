@@ -158,6 +158,10 @@ export function CardListTable({
         </div>
       )}
 
+      {/* mobile: secondary columns hide so the table fits the viewport
+          (library overflowed the screen); sm+ restores them. The wrapper
+          keeps any residual overflow inside the card instead of the page. */}
+      <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-line text-left">
@@ -173,10 +177,10 @@ export function CardListTable({
             </th>
             <th className="px-3 py-2.5"><SortHeader id="term" sort={sort} dir={dir} onToggle={toggleSort}>Term</SortHeader></th>
             <th className="px-3 py-2.5"><span className="label-caps text-muted">Translation</span></th>
-            {showDeck && <th className="px-3 py-2.5"><span className="label-caps text-muted">Deck</span></th>}
-            <th className="px-3 py-2.5"><SortHeader id="wordType" sort={sort} dir={dir} onToggle={toggleSort}>Type</SortHeader></th>
-            <th className="px-3 py-2.5"><span className="label-caps text-muted">State</span></th>
-            <th className="px-3 py-2.5"><SortHeader id="due" sort={sort} dir={dir} onToggle={toggleSort}>Next</SortHeader></th>
+            {showDeck && <th className="hidden px-3 py-2.5 md:table-cell"><span className="label-caps text-muted">Deck</span></th>}
+            <th className="hidden px-3 py-2.5 sm:table-cell"><SortHeader id="wordType" sort={sort} dir={dir} onToggle={toggleSort}>Type</SortHeader></th>
+            <th className="hidden px-3 py-2.5 md:table-cell"><span className="label-caps text-muted">State</span></th>
+            <th className="hidden px-3 py-2.5 sm:table-cell"><SortHeader id="due" sort={sort} dir={dir} onToggle={toggleSort}>Next</SortHeader></th>
             <th className="w-10 px-3 py-2.5" />
           </tr>
         </thead>
@@ -203,9 +207,9 @@ export function CardListTable({
                 <EditableCell cardId={card.id} field="translation" value={card.translation} />
               </td>
               {showDeck && (
-                <td className="px-3 py-2 text-[0.72rem] font-semibold text-muted">{card.deckName}</td>
+                <td className="hidden px-3 py-2 text-[0.72rem] font-semibold text-muted md:table-cell">{card.deckName}</td>
               )}
-              <td className="px-3 py-2">
+              <td className="hidden px-3 py-2 sm:table-cell">
                 <span className="inline-flex items-center gap-2 text-[0.72rem] font-bold">
                   <i className="h-2.5 w-2.5" style={{ background: wordTypeVar(card.wordType) }} />
                   {WORD_TYPE_LABELS[card.wordType]}
@@ -216,7 +220,7 @@ export function CardListTable({
                   )}
                 </span>
               </td>
-              <td className="px-3 py-2">
+              <td className="hidden px-3 py-2 md:table-cell">
                 <span
                   className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-muted"
                   title={SRS_STATE_LABELS[card.srs]}
@@ -225,7 +229,7 @@ export function CardListTable({
                   {SRS_STATE_LABELS[card.srs]}
                 </span>
               </td>
-              <td className="tnum px-3 py-2 text-[0.78rem] font-semibold text-muted">
+              <td className="tnum hidden px-3 py-2 text-[0.78rem] font-semibold text-muted sm:table-cell">
                 {dueLabel(card.due)}
               </td>
               <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
@@ -235,6 +239,7 @@ export function CardListTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

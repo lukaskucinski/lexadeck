@@ -41,7 +41,7 @@ export function ThemeToggle({
       <button
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         aria-label="Toggle theme"
-        className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] text-muted uppercase ${className}`}
+        className={`flex min-w-0 flex-col items-center gap-0.5 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] text-muted uppercase ${className}`}
       >
         <Icon size={20} strokeWidth={2} />
         Theme
