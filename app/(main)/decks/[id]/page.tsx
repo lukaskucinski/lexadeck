@@ -9,6 +9,7 @@ import { FlashCardPreview } from "@/components/card/FlashCardPreview";
 import { Pagination } from "@/components/card/Pagination";
 import { SearchBar } from "@/components/card/SearchBar";
 import { KanbanBoard } from "@/components/deck/KanbanBoard";
+import { LastDeckCookie } from "@/components/deck/LastDeckCookie";
 import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -115,6 +116,13 @@ export default async function DeckDetailPage({
 
   return (
     <div>
+      <LastDeckCookie deckId={id} />
+      {/* /decks auto-opens this deck again — ?all=1 suppresses the redirect */}
+      <nav className="label-caps mb-4">
+        <Link href="/decks?all=1" className="text-muted hover:text-ink">
+          ← all decks
+        </Link>
+      </nav>
       <header className="mb-6 border-b-[3px] border-line pb-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
