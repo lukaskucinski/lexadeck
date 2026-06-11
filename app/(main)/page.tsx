@@ -7,6 +7,7 @@ import { DeckTile } from "@/components/deck/DeckTile";
 import { requireUser } from "@/lib/auth";
 import { LAST_DECK_COOKIE } from "@/lib/decks";
 import { greetingFor, resolveGreetingLanguage } from "@/lib/greeting";
+import { resolveSubjectWord } from "@/lib/spinner";
 import { getDeckSummaries } from "@/lib/queries";
 import { APP_TZ, getReviewActivity } from "@/lib/stats";
 import { prisma } from "@/lib/db";
@@ -50,7 +51,8 @@ export default async function DashboardPage() {
     <div>
       <header className="border-b-[3px] border-line pb-8">
         <p className="label-caps mb-4 text-muted">
-          lexadeck<span className="text-coral">.</span> — flashcard language learning
+          lexadeck<span className="text-coral">.</span> — flashcard{" "}
+          {resolveSubjectWord(decks)} learning
         </p>
         <h1 className="type-display text-5xl md:text-7xl">
           {greetingFor(greetingLang, currentHour())},

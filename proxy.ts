@@ -29,6 +29,12 @@ export default async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
+    const { pathname } = request.nextUrl;
+    // first contact: the root URL shows the public landing page, not a login wall
+    if (pathname === "/") {
+      return NextResponse.rewrite(new URL("/welcome", request.url));
+    }
+    if (pathname === "/welcome") return response;
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return response;
