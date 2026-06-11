@@ -8,7 +8,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Project Overview
 Swiss-typographic Spanish flashcard PWA. Next.js 16 + Supabase Postgres + FSRS
-(`ts-fsrs` v5) scheduling. Single user (Lukas), password-gated.
+(`ts-fsrs` v5) scheduling. Multi-user via Supabase Auth (Lukas + test user Ari);
+decks/cards/stats are scoped by `Deck.userId`.
 Production: https://lexadeck.vercel.app (auto-deploys on push to `main`).
 Supabase project: `kuoediscikartsdebdfo` (us-east-1, "Kucinski GIS" account — the
 Supabase MCP must be authenticated against that account, not OSIT).
@@ -25,9 +26,14 @@ Supabase MCP must be authenticated against that account, not OSIT).
   "Again" cards re-enter the live session. Display states map in `getSRSState()`;
   mastered = Review state + stability ≥ 21d.
 - **Native forms + `useActionState` + zod.** No React Hook Form. No Zustand.
-- **Auth**: `proxy.ts` (Next 16 convention — NOT `middleware.ts`, that's deprecated).
-  Gate disabled when `SITE_PASSWORD` is unset; smoke tests rely on
-  `SITE_PASSWORD= npx next start -p 3457`.
+- **Auth**: Supabase Auth (email + password) via `@supabase/ssr`. `proxy.ts`
+  (Next 16 convention — NOT `middleware.ts`, that's deprecated) refreshes the
+  session and redirects signed-out requests to `/login`. Pages/actions call
+  `requireUser()` (`lib/auth.ts`) and scope every query by `Deck.userId`;
+  card mutations verify ownership first. Smoke tests sign in with
+  `E2E_EMAIL`/`E2E_PASSWORD` from `.env`; user creation/rotation is
+  `scripts/create-users.ts` (credentials land in gitignored `.env.credentials`,
+  never in chat/logs).
 - **AI providers**: Azure Translator F0 = translation; Gemini = enrichment;
   enrichment runs as local scripts only (keys are not Vercel env vars).
 

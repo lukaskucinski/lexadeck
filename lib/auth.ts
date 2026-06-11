@@ -1,13 +1,34 @@
-export const AUTH_COOKIE = "ld_auth";
+import { redirect } from "next/navigation";
+import { cache } from "react";
+import { supabaseServer } from "./supabase/server";
+
+export interface AppUser {
+  id: string;
+  email: string;
+  displayName: string;
+}
 
 /**
- * SHA-256 hex digest via Web Crypto — runs in both the Node and Edge
- * runtimes, so middleware and server actions share one implementation.
+ * Current Supabase Auth user, deduped per request render with React cache
+ * (layout + page + actions share one auth round-trip).
  */
-export async function hashPassword(password: string): Promise<string> {
-  const data = new TextEncoder().encode(`lexadeck:${password}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+export const getUser = cache(async (): Promise<AppUser | null> => {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const displayName =
+    (user.user_metadata?.display_name as string | undefined) ??
+    user.email?.split("@")[0] ??
+    "you";
+  return { id: user.id, email: user.email ?? "", displayName };
+});
+
+/** Pages and server actions call this first; unauthenticated → /login. */
+export async function requireUser(): Promise<AppUser> {
+  const user = await getUser();
+  if (!user) redirect("/login");
+  return user;
 }

@@ -5,6 +5,7 @@ import { EnrichButton } from "@/components/card/EnrichButton";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { SpeakButton } from "@/components/ui/SpeakButton";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSRSState, STABILITY_HINT } from "@/lib/srs";
 import type { Gender, WordType } from "@/lib/types";
@@ -23,8 +24,9 @@ export default async function CardDetailPage({
   params: Promise<{ id: string; cardId: string }>;
 }) {
   const { id, cardId } = await params;
-  const card = await prisma.card.findUnique({
-    where: { id: cardId },
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
     include: { deck: true, _count: { select: { reviews: true } } },
   });
   if (!card || card.deckId !== id) notFound();

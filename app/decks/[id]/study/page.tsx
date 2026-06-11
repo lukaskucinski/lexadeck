@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { StudySession } from "@/components/study/StudySession";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   interleaveQueue,
@@ -102,11 +103,11 @@ export default async function StudyPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const [{ id }, sp, user] = await Promise.all([params, searchParams, requireUser()]);
   // "Study more" links back here with a fresh ?s= value; keying the session on
   // it remounts the client component out of its "done" phase (board bug).
   const sessionKey = typeof sp.s === "string" ? sp.s : "initial";
-  const deck = await prisma.deck.findUnique({ where: { id } });
+  const deck = await prisma.deck.findFirst({ where: { id, userId: user.id } });
   if (!deck) notFound();
 
   const now = new Date();

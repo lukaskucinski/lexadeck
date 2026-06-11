@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseDeckCsv, type RowIssue } from "@/lib/import/deckCsv";
 import { emptySchedulerFields } from "@/lib/srs";
@@ -45,6 +46,7 @@ export async function importCards(
   _prev: ImportState,
   formData: FormData,
 ): Promise<ImportState> {
+  const user = await requireUser();
   const mode = formData.get("mode") === "import" ? "import" : "preview";
   const csvText = String(formData.get("csvText") ?? "");
   const fileName = String(formData.get("fileName") ?? "").trim() || "import.csv";
@@ -68,7 +70,9 @@ export async function importCards(
     deckName =
       String(formData.get("newDeckName") ?? "").trim() || deckNameFromFile(fileName);
   } else {
-    const deck = await prisma.deck.findUnique({ where: { id: target } });
+    const deck = await prisma.deck.findFirst({
+      where: { id: target, userId: user.id },
+    });
     if (!deck) return { error: "Choose a deck to import into." };
     deckId = deck.id;
     deckName = deck.name;
@@ -116,7 +120,11 @@ export async function importCards(
   const resolvedDeckId = await prisma.$transaction(async (tx) => {
     const id =
       deckId ??
-      (await tx.deck.create({ data: { name: deckName, language: deckLanguage } })).id;
+      (
+        await tx.deck.create({
+          data: { name: deckName, language: deckLanguage, userId: user.id },
+        })
+      ).id;
     await tx.card.createMany({
       data: importable.map((card) => ({
         deckId: id,

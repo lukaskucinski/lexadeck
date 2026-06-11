@@ -3,6 +3,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Heatmap } from "@/components/ui/Heatmap";
 import { DeckTile } from "@/components/deck/DeckTile";
+import { requireUser } from "@/lib/auth";
 import { getDeckSummaries } from "@/lib/queries";
 import { getReviewActivity } from "@/lib/stats";
 import { prisma } from "@/lib/db";
@@ -23,10 +24,12 @@ function greeting(): string {
 }
 
 export default async function DashboardPage() {
+  const user = await requireUser();
   const [decks, activity, recent] = await Promise.all([
-    getDeckSummaries(),
-    getReviewActivity(95),
+    getDeckSummaries(user.id),
+    getReviewActivity(user.id, 95),
     prisma.card.findMany({
+      where: { deck: { userId: user.id } },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, deckId: true, term: true, emoji: true },
@@ -45,7 +48,7 @@ export default async function DashboardPage() {
         <h1 className="type-display text-5xl md:text-7xl">
           {greeting()},
           <br />
-          <span className="text-coral">lukas.</span>
+          <span className="text-coral">{user.displayName.toLowerCase()}.</span>
         </h1>
         <p className="mt-5 max-w-[44ch] font-medium text-muted">
           {totalReady > 0 ? (

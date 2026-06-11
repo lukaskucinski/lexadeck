@@ -1,8 +1,9 @@
 /**
  * E2E smoke test for study mode. Requires the app running on PORT (default 3457)
- * with SITE_PASSWORD disabled. Verifies: preview → start → reveal → rate all
- * four buttons → Review rows persisted, card FSRS state mutated, Again card
- * re-queued within the session.
+ * and E2E_EMAIL/E2E_PASSWORD in .env (the smoke signs in via Supabase Auth).
+ * Verifies: login → preview → start → reveal → rate all four buttons →
+ * Review rows persisted, card FSRS state mutated, Again card re-queued
+ * within the session.
  *
  *   npx tsx scripts/study-smoke.ts
  */
@@ -13,13 +14,29 @@ import { prisma } from "../lib/db";
 const BASE = `http://localhost:${process.env.SMOKE_PORT ?? 3457}`;
 
 async function main() {
-  const deck = await prisma.deck.findFirst();
-  if (!deck) throw new Error("No deck in DB");
+  const email = process.env.E2E_EMAIL;
+  const password = process.env.E2E_PASSWORD;
+  if (!email || !password) throw new Error("E2E_EMAIL / E2E_PASSWORD not set");
+
+  // the smoke account's first deck — queries below stay scoped to it
+  const [owner] = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id::text AS id FROM auth.users WHERE email = ${email}
+  `;
+  if (!owner) throw new Error(`No auth user for ${email}`);
+  const deck = await prisma.deck.findFirst({ where: { userId: owner.id } });
+  if (!deck) throw new Error("No deck in DB for the smoke account");
 
   const reviewsBefore = await prisma.review.count();
 
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+
+  await page.goto(`${BASE}/login`);
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.includes("login"), { timeout: 15000 });
+  console.log("login: accepted credentials ✓");
 
   await page.goto(`${BASE}/decks/${deck.id}/study`);
   await page.getByRole("button", { name: /start session/i }).click();
@@ -42,12 +59,16 @@ async function main() {
   const easyTerm = await rateOnce(/easy/i);
   console.log(`rated EASY:  "${easyTerm}"`);
 
-  await page.waitForTimeout(800); // let server actions settle
-
   // --- assertions ---
-  const reviewsAfter = await prisma.review.count();
-  console.log(`reviews persisted: ${reviewsAfter - reviewsBefore} (expect 4)`);
-  if (reviewsAfter - reviewsBefore !== 4) throw new Error("expected 4 new reviews");
+  // server actions (auth check + transaction) settle asynchronously — poll
+  let persisted = 0;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    persisted = (await prisma.review.count()) - reviewsBefore;
+    if (persisted >= 4) break;
+    await page.waitForTimeout(500);
+  }
+  console.log(`reviews persisted: ${persisted} (expect 4)`);
+  if (persisted !== 4) throw new Error("expected 4 new reviews");
 
   const easyCard = await prisma.card.findFirst({
     where: { deckId: deck.id, term: easyTerm },

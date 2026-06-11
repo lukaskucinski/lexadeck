@@ -1,22 +1,42 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE, hashPassword } from "@/lib/auth";
 
 export default async function proxy(request: NextRequest) {
-  const password = process.env.SITE_PASSWORD;
-  if (!password) return NextResponse.next(); // gate disabled (local dev)
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return NextResponse.next(); // auth not configured (CI builds)
 
-  const cookie = request.cookies.get(AUTH_COOKIE)?.value;
-  if (cookie && cookie === (await hashPassword(password))) {
-    return NextResponse.next();
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value);
+        }
+        response = NextResponse.next({ request });
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set(name, value, options);
+        }
+      },
+    },
+  });
+
+  // also refreshes an expired session — do not remove
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
-
-  const unlockUrl = new URL("/unlock", request.url);
-  return NextResponse.redirect(unlockUrl);
+  return response;
 }
 
 export const config = {
   matcher: [
-    // Everything except the unlock page, Next internals, and static assets
-    "/((?!unlock|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)",
+    // Everything except the login page, Next internals, and static assets
+    "/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|lexadeck-import-template.csv).*)",
   ],
 };

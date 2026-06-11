@@ -6,13 +6,18 @@ import type { DayCount } from "@/components/ui/Heatmap";
 /** All review-day grouping uses this zone so streaks match the user's day. */
 export const APP_TZ = "America/Chicago";
 
-export async function getReviewActivity(sinceDays: number): Promise<DayCount[]> {
+export async function getReviewActivity(
+  userId: string,
+  sinceDays: number,
+): Promise<DayCount[]> {
   const since = new Date(Date.now() - sinceDays * 86_400_000);
   const rows = await prisma.$queryRaw<{ day: string; n: number }[]>`
-    SELECT to_char(("reviewedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS day,
+    SELECT to_char((r."reviewedAt" AT TIME ZONE 'UTC') AT TIME ZONE ${APP_TZ}, 'YYYY-MM-DD') AS day,
            count(*)::int AS n
-    FROM "Review"
-    WHERE "reviewedAt" >= ${since}
+    FROM "Review" r
+    JOIN "Card" c ON c.id = r."cardId"
+    JOIN "Deck" d ON d.id = c."deckId"
+    WHERE r."reviewedAt" >= ${since} AND d."userId" = ${userId}
     GROUP BY 1
   `;
   return rows.map((r) => ({ day: r.day, count: Number(r.n) }));
@@ -45,13 +50,20 @@ export interface SRSDistribution {
   count: number;
 }
 
-export async function getSRSDistribution(deckId?: string): Promise<SRSDistribution[]> {
+export async function getSRSDistribution(
+  userId: string,
+  deckId?: string,
+): Promise<SRSDistribution[]> {
   const now = new Date();
   const states: SRSState[] = ["new", "learning", "due", "scheduled", "mastered"];
   const counts = await Promise.all(
     states.map((state) =>
       prisma.card.count({
-        where: { ...(deckId ? { deckId } : {}), ...srsStateWhere(state, now) },
+        where: {
+          deck: { userId },
+          ...(deckId ? { deckId } : {}),
+          ...srsStateWhere(state, now),
+        },
       }),
     ),
   );

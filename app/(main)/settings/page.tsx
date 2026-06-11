@@ -4,6 +4,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { StudyExcludeChips } from "@/components/settings/StudyExcludeChips";
 import { SoundToggle } from "@/components/study/SoundToggle";
+import { Button } from "@/components/ui/Button";
+import { signOut } from "@/lib/actions/auth";
+import { requireUser } from "@/lib/auth";
 import {
   MAX_NEW_PER_SESSION,
   MAX_SESSION_SIZE,
@@ -86,6 +89,7 @@ function ProviderDot({ configured }: { configured: boolean }) {
 }
 
 export default async function SettingsPage() {
+  const user = await requireUser();
   const azure = Boolean(process.env.AZURE_TRANSLATOR_KEY && process.env.AZURE_TRANSLATOR_REGION);
   const gemini = Boolean(process.env.GEMINI_API_KEY);
   const deepl = Boolean(process.env.DEEPL_API_KEY);
@@ -144,15 +148,19 @@ export default async function SettingsPage() {
           </Row>
         </Section>
 
-        <Section title="Account" v2>
-          <Row label="Display name" hint="Single-user passcode gate today">
-            <StaticValue>lukas</StaticValue>
+        <Section title="Account">
+          <Row label="Display name" hint="From your Supabase Auth profile">
+            <StaticValue>{user.displayName}</StaticValue>
           </Row>
-          <Row label="Email & password" hint="Arrives with Supabase auth">
-            <StaticValue>—</StaticValue>
+          <Row label="Email" hint="Your sign-in identity">
+            <StaticValue>{user.email}</StaticValue>
           </Row>
-          <Row label="Multi-user decks" hint="Per-user decks, cards and review history">
-            <StaticValue>—</StaticValue>
+          <Row label="Session" hint="Decks, cards and progress are per-account">
+            <form action={signOut}>
+              <Button type="submit" variant="outline">
+                Sign out
+              </Button>
+            </form>
           </Row>
         </Section>
 

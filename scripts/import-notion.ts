@@ -64,8 +64,19 @@ async function main() {
     await prisma.deck.delete({ where: { id: existing.id } });
   }
 
+  // decks are per-user now — imports land on the account named by IMPORT_USER_EMAIL
+  const ownerEmail = process.env.IMPORT_USER_EMAIL ?? "lukaskucinski@gmail.com";
+  const [owner] = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id::text AS id FROM auth.users WHERE email = ${ownerEmail}
+  `;
+  if (!owner) {
+    console.error(`No auth user found for ${ownerEmail} — set IMPORT_USER_EMAIL.`);
+    process.exit(1);
+  }
+
   const deck = await prisma.deck.create({
     data: {
+      userId: owner.id,
       name: args.deck,
       language: "es",
       description: "Imported from Notion flashcard database",
