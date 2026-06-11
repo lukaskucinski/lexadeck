@@ -12,9 +12,9 @@ export const SPINNER_WORDS = [
   "geography",
   "coding",
   "history",
-  "law",
   "science",
   "exams",
+  "law",
   "medicine",
 ];
 
