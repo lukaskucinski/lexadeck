@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { StudyExcludeChips } from "@/components/settings/StudyExcludeChips";
@@ -156,6 +157,14 @@ export default async function SettingsPage() {
         </Section>
 
         <Section title="Data">
+          <Row label="Deck import" hint="CSV/TSV wizard with template, preview and dupe-skip">
+            <Link
+              href="/decks/import"
+              className="label-caps border-[1.5px] border-line px-3 py-1.5 transition-colors hover:bg-ink hover:text-bg"
+            >
+              Open wizard
+            </Link>
+          </Row>
           <Row label="Notion import" hint="CSV import via npm run import:notion">
             <StaticValue>CLI</StaticValue>
           </Row>

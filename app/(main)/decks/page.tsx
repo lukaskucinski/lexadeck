@@ -32,6 +32,9 @@ export default async function DecksPage({
   return (
     <div>
       <PageHeader title="decks">
+        <ButtonLink href="/decks/import" variant="outline">
+          Import
+        </ButtonLink>
         <ButtonLink href="/decks/new" variant="outline">
           + New deck
         </ButtonLink>
@@ -39,7 +42,7 @@ export default async function DecksPage({
 
       {decks.length === 0 ? (
         <EmptyState title="no decks yet">
-          Create a deck or run the Notion import script to get started.
+          Create a deck or import a CSV file to get started.
         </EmptyState>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">

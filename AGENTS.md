@@ -73,8 +73,9 @@ Supabase MCP must be authenticated against that account, not OSIT).
 ## Data Notes
 - Cards were imported once from the Notion export (CSV + per-page MD files) in
   `Downloads/38bec63f-…-Part-1/`; join key is (term from MD H1, Stage) — MD
-  filenames are truncated, never use them. Import scripts are one-off; an in-app
-  import wizard is v2 scope.
+  filenames are truncated, never use them. Import scripts are one-off; the in-app
+  CSV/TSV import wizard lives at `/decks/import` (`lib/import/deckCsv.ts` +
+  `lib/actions/import.ts`; template at `public/lexadeck-import-template.csv`).
 - Notion MD parsing lesson: use `[ \t]` not `\s` in line-anchored regexes — `\s`
   matches newlines and slurps the next line on empty fields.
 - Grammar Rules cards (`wordType: GRAMMAR`, ~172) intentionally have no

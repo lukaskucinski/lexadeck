@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Upload } from "lucide-react";
 import { toCardRow } from "@/components/card/cardRow";
 import { CardListTable } from "@/components/card/CardListTable";
 import { FilterPanel } from "@/components/card/FilterPanel";
@@ -134,6 +134,13 @@ export default async function DeckDetailPage({
               <span className="tnum text-coral">{ready.toLocaleString()} ready</span>
               <Link href={`/decks/${id}/edit`} className="hover:text-ink" title="Edit deck">
                 <Pencil size={13} />
+              </Link>
+              <Link
+                href={`/decks/import?deck=${id}`}
+                className="hover:text-ink"
+                title="Import cards from CSV"
+              >
+                <Upload size={13} />
               </Link>
             </div>
             <h1 className="type-display text-4xl md:text-5xl">{deck.name}</h1>
