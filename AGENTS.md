@@ -13,15 +13,26 @@ and Lorel); decks/cards/stats are scoped by `Deck.userId`. Tenancy enforcement
 is the app layer (Prisma connects as table owner, so RLS doesn't backstop it) —
 `scripts/isolation-smoke.ts` is the cross-tenant regression test; real RLS
 policies become necessary the day any client-side DB access is introduced.
-Production: https://lexadeck.vercel.app (auto-deploys on push to `main`).
-Supabase project: `kuoediscikartsdebdfo` (us-east-1, "Kucinski GIS" account — the
-Supabase MCP must be authenticated against that account, not OSIT).
+Production: https://lexadeck.vercel.app (auto-deploys on merge to `main`; PRs get
+preview deploys — check which build you're testing before judging a fix).
+Supabase project: `kuoediscikartsdebdfo` (us-east-1; transferred to Lukas's new
+Supabase account June 2026 — the MCP must be authenticated against that account).
 
 ## Canonical Docs
 - [Spec](.claude/docs/LEXADECK_SPEC.md) — architecture spec. **The v0.2 Amendments table at
   the top supersedes conflicting v0.1 sections below it** (design language, SRS, API style).
 - `README.md` — setup, env vars, scripts.
 - [Design System](.claude/docs/DESIGN_SYSTEM.md) — Swiss Typographic rules for all UI work.
+
+## TickTick Board (dev workflow)
+- Kanban project `6a28a16c8f083ab70be5322c` via the TickTick MCP; columns:
+  Aspirational / TODO / In Progress / Complete / Deprecated. A dev round =
+  one branch + PR covering a batch of cards.
+- Standing instruction from Lukas: once the round's PR exists, batch-update the
+  cards — prepend `RESOLVED (PR #N): <user-facing summary>` to each card's
+  content and move it to the Complete column.
+- Aspirational = backlog ideas; triage against current constraints (Gemini
+  quota, schema/DB state) before picking, and push back when timing is wrong.
 
 ## Architecture Decisions (do not relitigate)
 - **No REST API routes.** RSC reads + Server Actions (`lib/actions/*`) only.
@@ -37,8 +48,10 @@ Supabase MCP must be authenticated against that account, not OSIT).
   `E2E_EMAIL`/`E2E_PASSWORD` from `.env`; user creation/rotation is
   `scripts/create-users.ts` (credentials land in gitignored `.env.credentials`,
   never in chat/logs).
-- **AI providers**: Azure Translator F0 = translation; Gemini = enrichment;
-  enrichment runs as local scripts only (keys are not Vercel env vars).
+- **AI providers**: Azure Translator F0 = translation; Gemini = enrichment —
+  in-app ("AI enrich" on the card page; keys are Vercel env vars since June 9)
+  and bulk local scripts. Prompts are Spanish-tuned: don't enrich non-`es`
+  decks (e.g. Ari's Japanese deck) until that's generalized.
 
 ## Stack Gotchas
 - **Next.js pinned to 16.2.8** — npm `latest` tag is the 16.3 preview, which has
