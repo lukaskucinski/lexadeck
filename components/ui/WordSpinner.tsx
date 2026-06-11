@@ -51,10 +51,15 @@ export function WordSpinner({
   const yWindup = rowPct(rows - 2 + 0.4); // lever pull: nudge up 40% of a row
   const yLanded = "0%"; // settle word at the top of the strip
 
+  // The window paints 1.05em tall (descenders need the room) but its layout
+  // margin box is shrunk to a 0.25em sliver that sits inside the text strut,
+  // so the line box is purely text-driven — identical during the spin and
+  // after the swap to static text (no reflow below, ever). The positive
+  // align offsets the negative margins: alignment uses the margin edge.
   return (
     <motion.span
       data-reel
-      className={`relative inline-block h-[1.05em] overflow-hidden align-[-0.25em] ${
+      className={`relative my-[-0.4em] inline-block h-[1.05em] overflow-hidden align-[0.15em] ${
         landed ? "" : "[mask-image:linear-gradient(to_bottom,transparent,black_30%,black_70%,transparent)]"
       } ${className}`}
       animate={landed && settleWidth ? { width: settleWidth } : undefined}

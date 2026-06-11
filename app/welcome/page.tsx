@@ -29,7 +29,9 @@ export default async function WelcomePage() {
           <br />
           for{" "}
           <span className="whitespace-nowrap text-coral">
-            <WordSpinner words={SPINNER_WORDS} settleOn="anything" />.
+            <WordSpinner words={SPINNER_WORDS} settleOn="anything" />
+            {/* breathing room — the g's ink and the period abut at this tracking */}
+            <span className="ml-[0.04em]">.</span>
           </span>
         </h1>
 
