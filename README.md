@@ -19,7 +19,8 @@ npm run dev
 |---|---|
 | `DATABASE_URL` | Supabase pooled connection (port 6543, `?pgbouncer=true`) — URL-encode special chars in the password |
 | `DIRECT_URL` | Supabase session connection (port 5432) — used by `prisma db push` |
-| `SITE_PASSWORD` | Gate password; unset disables the gate (local dev) |
+| `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` | Supabase Auth (publishable values) — the login gate |
+| `E2E_EMAIL` / `E2E_PASSWORD` | Sign-in used by the Playwright smoke tests |
 | `AZURE_TRANSLATOR_KEY` / `_ENDPOINT` / `_REGION` | Azure AI Translator F0 — primary translation (2M chars/mo free) |
 | `GEMINI_API_KEY` | Gemini API Free — example sentences + emoji |
 | `DEEPL_API_KEY` + `ENABLE_DEEPL_FALLBACK` | Optional fallback translator (lifetime quota — off by default) |
@@ -39,5 +40,5 @@ npx tsx scripts/study-smoke.ts   # Playwright e2e against localhost:3457
 - **Prisma 7**: connection URLs live in `prisma.config.ts`, runtime client uses the
   `@prisma/adapter-pg` driver adapter; generated client is gitignored (`lib/generated/`)
 - **No REST API** — Server Actions + RSC only
-- **Auth** — Next 16 `proxy.ts` convention; SHA-256 cookie vs `SITE_PASSWORD`
+- **Auth** — Supabase Auth (email + password) via `@supabase/ssr`; Next 16 `proxy.ts` gates and refreshes sessions, queries scope by `Deck.userId`
 - **Theme** — Tailwind v4 `@theme inline` tokens in `app/globals.css`, dark mode via `[data-theme]`

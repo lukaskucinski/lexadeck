@@ -5,6 +5,7 @@ import { Pagination } from "@/components/card/Pagination";
 import { SearchBar } from "@/components/card/SearchBar";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildCardWhere, cardOrderBy, parseCardViewParams } from "@/lib/queries";
 
@@ -17,10 +18,11 @@ export default async function LibraryPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const user = await requireUser();
   const sp = await searchParams;
   const vp = parseCardViewParams(sp);
   const now = new Date();
-  const where = buildCardWhere(vp.filters, now);
+  const where = { deck: { userId: user.id }, ...buildCardWhere(vp.filters, now) };
 
   const [cards, total, decks] = await Promise.all([
     prisma.card.findMany({
@@ -31,7 +33,11 @@ export default async function LibraryPage({
       take: PAGE_SIZE,
     }),
     prisma.card.count({ where }),
-    prisma.deck.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.deck.findMany({
+      where: { userId: user.id },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const rows = cards.map((c) => toCardRow(c, now, c.deck.name));

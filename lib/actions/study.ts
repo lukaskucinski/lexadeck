@@ -1,10 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { rateCard, type Grade, type SchedulerFields } from "@/lib/srs";
 
 export async function startSession(deckId: string): Promise<string> {
+  const user = await requireUser();
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, userId: user.id },
+    select: { id: true },
+  });
+  if (!deck) throw new Error("Deck not found");
   const session = await prisma.session.create({ data: { deckId } });
   return session.id;
 }
@@ -22,7 +29,10 @@ export async function submitReview(
   cardId: string,
   rating: Grade,
 ): Promise<ReviewOutcome> {
-  const card = await prisma.card.findUnique({ where: { id: cardId } });
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+  });
   if (!card) throw new Error("Card not found");
 
   const now = new Date();
@@ -48,6 +58,12 @@ export async function submitReview(
 }
 
 export async function endSession(sessionId: string, cardCount: number): Promise<void> {
+  const user = await requireUser();
+  const owned = await prisma.session.findFirst({
+    where: { id: sessionId, deck: { userId: user.id } },
+    select: { id: true },
+  });
+  if (!owned) throw new Error("Session not found");
   const session = await prisma.session.update({
     where: { id: sessionId },
     data: { endedAt: new Date(), cardCount },

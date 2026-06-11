@@ -3,6 +3,7 @@ import { DeckForm } from "@/components/deck/DeckForm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { deleteDeck, updateDeck } from "@/lib/actions/decks";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export default async function EditDeckPage({
@@ -11,8 +12,9 @@ export default async function EditDeckPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const deck = await prisma.deck.findUnique({
-    where: { id },
+  const user = await requireUser();
+  const deck = await prisma.deck.findFirst({
+    where: { id, userId: user.id },
     include: { _count: { select: { cards: true } } },
   });
   if (!deck) notFound();

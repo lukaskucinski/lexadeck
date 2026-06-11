@@ -3,6 +3,7 @@ import { CardForm } from "@/components/card/CardForm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { deleteCard, updateCard } from "@/lib/actions/cards";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export default async function EditCardPage({
@@ -11,7 +12,10 @@ export default async function EditCardPage({
   params: Promise<{ id: string; cardId: string }>;
 }) {
   const { id, cardId } = await params;
-  const card = await prisma.card.findUnique({ where: { id: cardId } });
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+  });
   if (!card || card.deckId !== id) notFound();
 
   const updateAction = updateCard.bind(null, cardId);

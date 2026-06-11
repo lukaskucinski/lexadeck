@@ -14,6 +14,7 @@ import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth";
 import {
   buildCardWhere,
   cardOrderBy,
@@ -52,7 +53,8 @@ export default async function DeckDetailPage({
   const vp = parseCardViewParams(sp);
   const now = new Date();
 
-  const deck = await prisma.deck.findUnique({ where: { id } });
+  const user = await requireUser();
+  const deck = await prisma.deck.findFirst({ where: { id, userId: user.id } });
   if (!deck) notFound();
 
   const studyExclude = parseStudyExclude((await cookies()).get(STUDY_EXCLUDE_COOKIE)?.value);

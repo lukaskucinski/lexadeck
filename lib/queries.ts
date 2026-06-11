@@ -136,23 +136,27 @@ export interface DeckSummary {
   lastStudied: Date | null;
 }
 
-export async function getDeckSummaries(now: Date = new Date()): Promise<DeckSummary[]> {
+export async function getDeckSummaries(
+  userId: string,
+  now: Date = new Date(),
+): Promise<DeckSummary[]> {
+  const owned = { deck: { userId } };
   const [decks, counts, ready, mastered, lastSessions] = await Promise.all([
-    prisma.deck.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.card.groupBy({ by: ["deckId"], _count: { _all: true } }),
+    prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
+    prisma.card.groupBy({ by: ["deckId"], where: owned, _count: { _all: true } }),
     prisma.card.groupBy({
       by: ["deckId"],
-      where: { due: { lte: now }, masteredAt: null },
+      where: { ...owned, due: { lte: now }, masteredAt: null },
       _count: { _all: true },
     }),
     prisma.card.groupBy({
       by: ["deckId"],
-      where: srsStateWhere("mastered", now),
+      where: { ...owned, AND: [srsStateWhere("mastered", now)] },
       _count: { _all: true },
     }),
     prisma.session.groupBy({
       by: ["deckId"],
-      where: { deckId: { not: null } },
+      where: { deckId: { not: null }, deck: { userId } },
       _max: { startedAt: true },
     }),
   ]);

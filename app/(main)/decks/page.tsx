@@ -4,6 +4,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DeckTile } from "@/components/deck/DeckTile";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { requireUser } from "@/lib/auth";
 import { LAST_DECK_COOKIE, resolveDeckLanding } from "@/lib/decks";
 import { getDeckSummaries } from "@/lib/queries";
 
@@ -14,8 +15,9 @@ export default async function DecksPage({
 }: {
   searchParams: Promise<{ all?: string }>;
 }) {
+  const user = await requireUser();
   const [decks, sp, cookieStore] = await Promise.all([
-    getDeckSummaries(),
+    getDeckSummaries(user.id),
     searchParams,
     cookies(),
   ]);

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export interface ActionState {
@@ -40,14 +41,26 @@ function deckDataFromForm(formData: FormData) {
   });
 }
 
+/** Throws unless the deck exists and belongs to the signed-in user. */
+async function requireOwnedDeck(deckId: string): Promise<string> {
+  const user = await requireUser();
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, userId: user.id },
+    select: { id: true },
+  });
+  if (!deck) throw new Error("Deck not found");
+  return user.id;
+}
+
 export async function createDeck(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const parsed = deckDataFromForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const deck = await prisma.deck.create({ data: parsed.data });
+  const deck = await prisma.deck.create({ data: { ...parsed.data, userId: user.id } });
   revalidatePath("/decks");
   redirect(`/decks/${deck.id}`);
 }
@@ -57,6 +70,7 @@ export async function updateDeck(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireOwnedDeck(deckId);
   const parsed = deckDataFromForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -67,6 +81,7 @@ export async function updateDeck(
 }
 
 export async function deleteDeck(deckId: string): Promise<void> {
+  await requireOwnedDeck(deckId);
   await prisma.deck.delete({ where: { id: deckId } });
   revalidatePath("/decks");
   redirect("/decks");

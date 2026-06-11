@@ -1,37 +1,47 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Heatmap } from "@/components/ui/Heatmap";
 import { DeckTile } from "@/components/deck/DeckTile";
+import { requireUser } from "@/lib/auth";
+import { LAST_DECK_COOKIE } from "@/lib/decks";
+import { greetingFor, resolveGreetingLanguage } from "@/lib/greeting";
 import { getDeckSummaries } from "@/lib/queries";
-import { getReviewActivity } from "@/lib/stats";
+import { APP_TZ, getReviewActivity } from "@/lib/stats";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-function greeting(): string {
-  const h = Number(
+function currentHour(): number {
+  return Number(
     new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
+      timeZone: APP_TZ,
       hour: "numeric",
       hour12: false,
     }).format(new Date()),
   );
-  if (h < 12) return "buenos días";
-  if (h < 19) return "buenas tardes";
-  return "buenas noches";
 }
 
 export default async function DashboardPage() {
-  const [decks, activity, recent] = await Promise.all([
-    getDeckSummaries(),
-    getReviewActivity(95),
+  const user = await requireUser();
+  const [decks, activity, recent, cookieStore] = await Promise.all([
+    getDeckSummaries(user.id),
+    getReviewActivity(user.id, 95),
     prisma.card.findMany({
+      where: { deck: { userId: user.id } },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, deckId: true, term: true, emoji: true },
     }),
+    cookies(),
   ]);
+
+  // greet in the language of the deck the user actually works in
+  const greetingLang = resolveGreetingLanguage(
+    decks,
+    cookieStore.get(LAST_DECK_COOKIE)?.value,
+  );
 
   const totalReady = decks.reduce((sum, d) => sum + d.readyCount, 0);
   const primaryDeck = [...decks].sort((a, b) => b.readyCount - a.readyCount)[0];
@@ -43,9 +53,9 @@ export default async function DashboardPage() {
           lexadeck<span className="text-coral">.</span> — flashcard language learning
         </p>
         <h1 className="type-display text-5xl md:text-7xl">
-          {greeting()},
+          {greetingFor(greetingLang, currentHour())},
           <br />
-          <span className="text-coral">lukas.</span>
+          <span className="text-coral">{user.displayName.toLowerCase()}.</span>
         </h1>
         <p className="mt-5 max-w-[44ch] font-medium text-muted">
           {totalReady > 0 ? (

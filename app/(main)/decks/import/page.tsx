@@ -1,6 +1,7 @@
 import { Download } from "lucide-react";
 import { ImportWizard } from "@/components/import/ImportWizard";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MAX_IMPORT_ROWS } from "@/lib/import/deckCsv";
 
@@ -44,8 +45,13 @@ export default async function ImportPage({
 }: {
   searchParams: Promise<{ deck?: string }>;
 }) {
+  const user = await requireUser();
   const [decks, sp] = await Promise.all([
-    prisma.deck.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.deck.findMany({
+      where: { userId: user.id },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     searchParams,
   ]);
 

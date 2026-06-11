@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { geminiEnrich, translateBatch } from "@/lib/ai/enrichment";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { emptySchedulerFields } from "@/lib/srs";
 import { CardType, Gender, WordType } from "@/lib/types";
@@ -61,15 +62,26 @@ function revalidateCardPaths(deckId: string) {
   revalidatePath("/");
 }
 
+/** Throws unless the card exists and belongs to the signed-in user. */
+async function requireOwnedCard(cardId: string): Promise<void> {
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+    select: { id: true },
+  });
+  if (!card) throw new Error("Card not found");
+}
+
 export async function createCard(
   deckId: string,
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const parsed = cardDataFromForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const deck = await prisma.deck.findUnique({ where: { id: deckId } });
+  const deck = await prisma.deck.findFirst({ where: { id: deckId, userId: user.id } });
   if (!deck) return { error: "Deck not found" };
 
   const dupe = await prisma.card.findFirst({
@@ -99,6 +111,7 @@ export async function updateCard(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireOwnedCard(cardId);
   const parsed = cardDataFromForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -119,6 +132,7 @@ export async function updateCardInline(
   const trimmed = value.trim();
   if (field === "term" && !trimmed) return { error: "Term cannot be empty" };
 
+  await requireOwnedCard(cardId);
   const card = await prisma.card.update({
     where: { id: cardId },
     data: { [field]: field === "translation" && !trimmed ? null : trimmed },
@@ -132,6 +146,7 @@ export async function setCardWordType(
   cardId: string,
   wordType: WordType,
 ): Promise<void> {
+  await requireOwnedCard(cardId);
   const data: { wordType: WordType; gender?: null } = { wordType };
   if (wordType !== "NOUN") data.gender = null;
   const card = await prisma.card.update({ where: { id: cardId }, data });
@@ -143,7 +158,10 @@ export async function setCardWordType(
  * (Azure Translator) and generates example/exampleEn/emoji (Gemini).
  */
 export async function enrichCard(cardId: string): Promise<{ error?: string }> {
-  const card = await prisma.card.findUnique({ where: { id: cardId } });
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+  });
   if (!card) return { error: "Card not found" };
   if (card.wordType === "GRAMMAR") {
     return { error: "Grammar cards aren't auto-enriched" };
@@ -188,6 +206,7 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
 
 /** Manual mastery: a mastered card never enters study sessions. */
 export async function setCardMastered(cardId: string, mastered: boolean): Promise<void> {
+  await requireOwnedCard(cardId);
   const card = await prisma.card.update({
     where: { id: cardId },
     data: { masteredAt: mastered ? new Date() : null },
@@ -201,6 +220,7 @@ export async function setCardMastered(cardId: string, mastered: boolean): Promis
  * flag — "unmaster" means the card should be studyable again.
  */
 export async function queueCardForReview(cardId: string): Promise<void> {
+  await requireOwnedCard(cardId);
   const card = await prisma.card.update({
     where: { id: cardId },
     data: { due: new Date(), masteredAt: null },
@@ -210,6 +230,7 @@ export async function queueCardForReview(cardId: string): Promise<void> {
 }
 
 export async function deleteCard(cardId: string): Promise<void> {
+  await requireOwnedCard(cardId);
   const card = await prisma.card.delete({ where: { id: cardId } });
   revalidateCardPaths(card.deckId);
   redirect(`/decks/${card.deckId}?view=list`);
@@ -217,7 +238,9 @@ export async function deleteCard(cardId: string): Promise<void> {
 
 export async function deleteCards(cardIds: string[]): Promise<void> {
   if (cardIds.length === 0) return;
-  const first = await prisma.card.findUnique({ where: { id: cardIds[0] } });
-  await prisma.card.deleteMany({ where: { id: { in: cardIds } } });
+  const user = await requireUser();
+  const owned = { deck: { userId: user.id } };
+  const first = await prisma.card.findFirst({ where: { id: cardIds[0], ...owned } });
+  await prisma.card.deleteMany({ where: { id: { in: cardIds }, ...owned } });
   if (first) revalidateCardPaths(first.deckId);
 }

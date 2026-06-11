@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Heatmap } from "@/components/ui/Heatmap";
+import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getDeckSummaries } from "@/lib/queries";
 import { STABILITY_HINT } from "@/lib/srs";
@@ -13,21 +14,23 @@ export const dynamic = "force-dynamic";
 const SEGMENTS = 24;
 
 export default async function ProgressPage() {
+  const user = await requireUser();
+  const owned = { deck: { userId: user.id } };
   const [activity, distribution, decks, totalReviews, totalSessions, difficult, graduates] =
     await Promise.all([
-      getReviewActivity(370),
-      getSRSDistribution(),
-      getDeckSummaries(),
-      prisma.review.count(),
-      prisma.session.count({ where: { endedAt: { not: null } } }),
+      getReviewActivity(user.id, 370),
+      getSRSDistribution(user.id),
+      getDeckSummaries(user.id),
+      prisma.review.count({ where: { card: owned } }),
+      prisma.session.count({ where: { endedAt: { not: null }, deck: { userId: user.id } } }),
       prisma.card.findMany({
-        where: { reps: { gt: 0 } },
+        where: { ...owned, reps: { gt: 0 } },
         orderBy: { difficulty: "desc" },
         take: 8,
         select: { id: true, deckId: true, term: true, translation: true, difficulty: true, lapses: true },
       }),
       prisma.card.findMany({
-        where: { reps: { gt: 0 } },
+        where: { ...owned, reps: { gt: 0 } },
         orderBy: { stability: "desc" },
         take: 8,
         select: { id: true, deckId: true, term: true, translation: true, stability: true },
