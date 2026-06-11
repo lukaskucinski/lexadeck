@@ -82,7 +82,7 @@ export function WordSpinner({
     <span
       ref={windowRef}
       data-reel
-      className={`relative my-[-0.4em] inline-block h-[1.05em] overflow-hidden align-[0.15em] [mask-image:linear-gradient(to_bottom,transparent,black_30%,black_70%,transparent)] ${className}`}
+      className={`relative my-[-0.4em] inline-block h-[1.05em] overflow-hidden align-[0.15em] ${className}`}
     >
       {/* invisible copy of the settle word for the closing width glide */}
       <span ref={measureRef} aria-hidden className="invisible absolute whitespace-nowrap">
