@@ -7,8 +7,7 @@ import { DeckTile } from "@/components/deck/DeckTile";
 import { requireUser } from "@/lib/auth";
 import { LAST_DECK_COOKIE } from "@/lib/decks";
 import { greetingFor, resolveGreetingLanguage } from "@/lib/greeting";
-import { resolveSpinnerWord, SPINNER_WORDS } from "@/lib/spinner";
-import { WordSpinner } from "@/components/ui/WordSpinner";
+import { resolveSubjectWord } from "@/lib/spinner";
 import { getDeckSummaries } from "@/lib/queries";
 import { APP_TZ, getReviewActivity } from "@/lib/stats";
 import { prisma } from "@/lib/db";
@@ -53,12 +52,7 @@ export default async function DashboardPage() {
       <header className="border-b-[3px] border-line pb-8">
         <p className="label-caps mb-4 text-muted">
           lexadeck<span className="text-coral">.</span> — flashcard{" "}
-          <WordSpinner
-            words={SPINNER_WORDS}
-            landOn={resolveSpinnerWord(decks)}
-            className="text-ink"
-          />{" "}
-          learning
+          {resolveSubjectWord(decks)} learning
         </p>
         <h1 className="type-display text-5xl md:text-7xl">
           {greetingFor(greetingLang, currentHour())},
