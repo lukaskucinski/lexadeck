@@ -32,13 +32,16 @@ export function WordSpinner({
   const measureRef = useRef<HTMLSpanElement>(null);
   const [settleWidth, setSettleWidth] = useState<number | null>(null);
   const [landed, setLanded] = useState(false);
+  // after the width collapse, swap to plain text — the masked window clips
+  // the final glyph's ink overhang (the "g" of "anything" lost its right edge)
+  const [done, setDone] = useState(false);
   const reduced = useReducedMotion();
 
   useEffect(() => {
     setSettleWidth(measureRef.current?.getBoundingClientRect().width ?? null);
   }, []);
 
-  if (reduced) {
+  if (reduced || done) {
     return <span className={className}>{settleOn}</span>;
   }
 
@@ -56,6 +59,7 @@ export function WordSpinner({
       } ${className}`}
       animate={landed && settleWidth ? { width: settleWidth } : undefined}
       transition={{ duration: 0.25, ease: "easeOut" }}
+      onAnimationComplete={() => landed && setDone(true)}
     >
       {/* invisible copy of the settle word for the width collapse */}
       <span ref={measureRef} aria-hidden className="invisible absolute whitespace-nowrap">
@@ -71,7 +75,10 @@ export function WordSpinner({
           times: [0, 0.08, 1],
           ease: ["easeOut", [0.22, 1, 0.36, 1]],
         }}
-        onAnimationComplete={() => setLanded(true)}
+        onAnimationComplete={() => {
+          setLanded(true);
+          if (!settleWidth) setDone(true); // no measurement → skip the collapse
+        }}
       >
         {strip.map((word, i) => (
           <span key={`${word}-${i}`} className="block h-[1.05em] leading-[1.05]">
