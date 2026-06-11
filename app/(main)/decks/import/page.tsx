@@ -15,7 +15,7 @@ const FORMAT_ROWS: [column: string, required: string, values: string, example: s
     "Noun · Verb · Adjective · Adverb · Pronoun · Article · Conjunction · Preposition · Expression · Grammar · Other",
     "Noun",
   ],
-  ["Gender", "", "Masculine/M · Feminine/F · Neuter · Either — nouns only", "F"],
+  ["Gender", "", "Masculine/M · Feminine/F · Neuter · Either — nouns only", "M"],
   ["Card Type", "", "Vocab · Grammar · Expression (inferred from word type if blank)", "Vocab"],
   ["Example", "", "Example sentence in Spanish", "El perro corre."],
   ["Example Translation", "", "English gloss of the example", "The dog runs."],
