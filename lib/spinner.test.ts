@@ -8,17 +8,17 @@ import {
 } from "./spinner";
 
 describe("SPINNER_WORDS", () => {
-  it("rotates through the use-case domains in order", () => {
+  it("opens with languages, then ascends popularity so the decelerating reel dwells on bigger use cases", () => {
     expect(SPINNER_WORDS).toEqual([
       "languages",
-      "medicine",
-      "exams",
-      "science",
-      "law",
-      "history",
-      "coding",
+      "art",
       "geography",
-      "music",
+      "coding",
+      "history",
+      "law",
+      "science",
+      "exams",
+      "medicine",
     ]);
   });
 });

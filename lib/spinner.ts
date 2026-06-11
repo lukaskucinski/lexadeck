@@ -4,16 +4,18 @@
  * subject word resolved from the user's decks.
  */
 
+// After the opener, ascending popularity: the reel decelerates, so words
+// later in the pass get a little more show time.
 export const SPINNER_WORDS = [
   "languages",
-  "medicine",
-  "exams",
-  "science",
-  "law",
-  "history",
-  "coding",
+  "art",
   "geography",
-  "music",
+  "coding",
+  "history",
+  "law",
+  "science",
+  "exams",
+  "medicine",
 ];
 
 /** Beat before the lever-pull anticipation kicks the reel off. */
