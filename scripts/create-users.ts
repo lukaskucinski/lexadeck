@@ -23,6 +23,7 @@ import { Client } from "pg";
 const USERS = [
   { email: "lukaskucinski@gmail.com", displayName: "Lukas", e2e: true },
   { email: "ari.j.herman@gmail.com", displayName: "Ari", e2e: false },
+  { email: "lorelschmitzberger@gmail.com", displayName: "Lorel", e2e: false },
 ] as const;
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;

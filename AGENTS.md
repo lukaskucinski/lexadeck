@@ -8,8 +8,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Project Overview
 Swiss-typographic Spanish flashcard PWA. Next.js 16 + Supabase Postgres + FSRS
-(`ts-fsrs` v5) scheduling. Multi-user via Supabase Auth (Lukas + test user Ari);
-decks/cards/stats are scoped by `Deck.userId`.
+(`ts-fsrs` v5) scheduling. Multi-user via Supabase Auth (Lukas + test users Ari
+and Lorel); decks/cards/stats are scoped by `Deck.userId`. Tenancy enforcement
+is the app layer (Prisma connects as table owner, so RLS doesn't backstop it) —
+`scripts/isolation-smoke.ts` is the cross-tenant regression test; real RLS
+policies become necessary the day any client-side DB access is introduced.
 Production: https://lexadeck.vercel.app (auto-deploys on push to `main`).
 Supabase project: `kuoediscikartsdebdfo` (us-east-1, "Kucinski GIS" account — the
 Supabase MCP must be authenticated against that account, not OSIT).
@@ -70,11 +73,15 @@ Supabase MCP must be authenticated against that account, not OSIT).
   UI → smoke test), then flesh it out — don't build layers in isolation.
 
 ## Testing
-- `npm test` — vitest units for `lib/srs.ts` and `lib/import/notion.ts`.
-- `npx tsx scripts/study-smoke.ts` — Playwright e2e (needs gate-disabled server
-  on port 3457); asserts review rows, FSRS mutation, Again re-queue.
+- `npm test` — vitest units (srs, import parsers, filters, speech, greeting…).
+- `npx tsx scripts/study-smoke.ts` — Playwright e2e (server on port 3457; signs
+  in with `E2E_EMAIL`/`E2E_PASSWORD`); asserts review rows, FSRS mutation,
+  Again re-queue.
+- `npx tsx scripts/isolation-smoke.ts` — cross-tenant regression (server on
+  3457; secondary login from `.env.credentials`): own decks visible, foreign
+  decks invisible + 404. Run after touching queries or auth scoping.
 - `npx tsx scripts/ai-smoke.ts` — one tiny request per AI provider.
-- `npx tsx scripts/prod-smoke.ts` — unlock + live-data check against production.
+- `npx tsx scripts/prod-smoke.ts` — login + live-data check against production.
 
 ## Data Notes
 - Cards were imported once from the Notion export (CSV + per-page MD files) in
