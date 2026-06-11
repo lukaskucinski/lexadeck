@@ -71,7 +71,10 @@ export function WordSpinner({
         {settleOn}
       </span>
       <motion.span
-        className="block"
+        // top offset: the rows' internal baseline sits 0.054em below the
+        // headline baseline (measured; Archivo's ascent/descent split) — lift
+        // the strip so the landed word doesn't jump up at the static swap
+        className="relative top-[-0.054em] block"
         initial={{ y: yStart }}
         animate={{ y: [yStart, yWindup, yLanded] }}
         transition={{
