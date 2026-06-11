@@ -129,28 +129,6 @@ select option {
   font-weight: 600;
 }
 
-/* ---- word spinner (tagline domain rotation) --------------- */
-@keyframes word-spin-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.45em);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.word-spin-in {
-  /* must finish inside the fastest slot step (120ms) so every word reaches
-     full opacity before the next flip */
-  animation: word-spin-in 90ms ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  .word-spin-in {
-    animation: none;
-  }
-}
-
 /* ---- 3D flip support for study cards --------------------- */
 .preserve-3d {
   transform-style: preserve-3d;

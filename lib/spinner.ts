@@ -16,33 +16,18 @@ export const SPINNER_WORDS = [
   "music",
 ];
 
-export interface SpinEntry {
-  word: string;
-  holdMs: number;
-}
-
-const FIRST_HOLD_MS = 1200;
-const SPIN_MIN_MS = 120;
-const SPIN_MAX_MS = 850;
+/** Beat before the lever-pull anticipation kicks the reel off. */
+export const REEL_DELAY_MS = 400;
+/** Up-bump + fall + creep-to-landing, one keyframed motion. */
+export const REEL_SPIN_MS = 3300;
 
 /**
- * Slot-machine pass: linger on the opener, then spin through the rest with a
- * continuously decelerating quadratic ramp (quick out of the gate, easing
- * into the landing), settling on `settleOn` forever (terminal entry, holdMs
- * Infinity). ~4.2s total for the 9-word list — the rotation shows the
- * examples; the settle states the thesis. `settleOn` is never played twice
- * if it already ends the list.
+ * Reel order: one pass through `words`, landing on `settleOn` — the rotation
+ * shows the examples; the settle states the thesis. `settleOn` is never
+ * played twice if it already ends the list.
  */
-export function spinTimeline(words: readonly string[], settleOn: string): SpinEntry[] {
-  const pass = words[words.length - 1] === settleOn ? words.slice(0, -1) : [...words];
-  const last = pass.length - 1;
-  const entries: SpinEntry[] = pass.map((word, i) => {
-    if (i === 0) return { word, holdMs: FIRST_HOLD_MS };
-    const t = last > 1 ? (i - 1) / (last - 1) : 1;
-    return { word, holdMs: Math.round(SPIN_MIN_MS + (SPIN_MAX_MS - SPIN_MIN_MS) * t * t) };
-  });
-  entries.push({ word: settleOn, holdMs: Infinity });
-  return entries;
+export function reelStrip(words: readonly string[], settleOn: string): string[] {
+  return words[words.length - 1] === settleOn ? [...words] : [...words, settleOn];
 }
 
 export interface SubjectDeck {
