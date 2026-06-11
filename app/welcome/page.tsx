@@ -23,8 +23,8 @@ export default async function WelcomePage() {
 
       <main className="flex flex-1 flex-col justify-center py-16">
         <p className="label-caps mb-6 text-muted">spaced repetition, typographically</p>
-        {/* mobile size fits the widest rotation word ("certifications.") on 390px */}
-        <h1 className="type-display text-[2.6rem] sm:text-7xl md:text-8xl">
+        {/* mobile size fits the widest rotation word ("geography.") on 390px */}
+        <h1 className="type-display text-5xl sm:text-7xl md:text-8xl">
           flashcards
           <br />
           for{" "}

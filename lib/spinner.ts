@@ -9,7 +9,6 @@ export const SPINNER_WORDS = [
   "medicine",
   "exams",
   "science",
-  "certifications",
   "law",
   "history",
   "coding",
