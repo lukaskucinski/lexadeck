@@ -9,7 +9,6 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSRSState, STABILITY_HINT } from "@/lib/srs";
 import type { Gender, WordType } from "@/lib/types";
-import { wordTypeVar } from "@/lib/wordTypeColors";
 
 export const dynamic = "force-dynamic";
 
@@ -122,10 +121,6 @@ export default async function CardDetailPage({
         {card.wordType !== "GRAMMAR" && (
           <EnrichButton cardId={cardId} enriched={card.enrichedAt != null} />
         )}
-        <span
-          className="ml-auto h-3 w-3"
-          style={{ background: wordTypeVar(card.wordType as WordType) }}
-        />
       </div>
     </div>
   );
