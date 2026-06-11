@@ -141,9 +141,9 @@ select option {
   }
 }
 .word-spin-in {
-  /* must finish well inside the rotation dwell so the word always reaches
+  /* must finish inside the fastest slot step (120ms) so every word reaches
      full opacity before the next flip */
-  animation: word-spin-in 140ms ease-out;
+  animation: word-spin-in 90ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .word-spin-in {

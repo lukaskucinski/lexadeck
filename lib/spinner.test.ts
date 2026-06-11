@@ -41,12 +41,21 @@ describe("spinTimeline", () => {
     expect(timeline[0].holdMs).toBeGreaterThan(timeline[1].holdMs);
   });
 
-  it("decelerates into the settle: the last holds never speed up", () => {
+  it("decelerates continuously: every spin step holds at least as long as the previous", () => {
     const timeline = spinTimeline(words, "anything");
-    const lastThree = timeline.slice(-4, -1).map((e) => e.holdMs);
-    for (let i = 1; i < lastThree.length; i++) {
-      expect(lastThree[i]).toBeGreaterThanOrEqual(lastThree[i - 1]);
+    const spinHolds = timeline.slice(1, -1).map((e) => e.holdMs);
+    for (let i = 1; i < spinHolds.length; i++) {
+      expect(spinHolds[i]).toBeGreaterThanOrEqual(spinHolds[i - 1]);
     }
+  });
+
+  it("keeps the full rotation between 3 and 5 seconds for the real word list", () => {
+    const timeline = spinTimeline(SPINNER_WORDS, "anything");
+    const total = timeline
+      .filter((e) => Number.isFinite(e.holdMs))
+      .reduce((sum, e) => sum + e.holdMs, 0);
+    expect(total).toBeGreaterThanOrEqual(3000);
+    expect(total).toBeLessThanOrEqual(5000);
   });
 
   it("returns only the settle entry for an empty word list", () => {
