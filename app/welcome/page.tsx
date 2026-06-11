@@ -29,7 +29,7 @@ export default async function WelcomePage() {
           <br />
           for{" "}
           <span className="whitespace-nowrap text-coral">
-            <WordSpinner words={SPINNER_WORDS} />.
+            <WordSpinner words={SPINNER_WORDS} settleOn="anything" />.
           </span>
         </h1>
 
