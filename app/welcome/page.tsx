@@ -52,11 +52,15 @@ export default async function WelcomePage() {
         {/* ---------- hero: fills the first viewport, as before ---------- */}
         <section className="flex min-h-[calc(100vh-8.5rem)] flex-col justify-center py-16">
           <p className="label-caps mb-6 text-muted">spaced repetition, typographically</p>
-          {/* mobile size fits the widest rotation word ("geography.") on 390px */}
+          {/* below lg the reel gets its own line — during the spin the window
+              is as wide as the widest word, and letting it wrap beside "for"
+              made the hero jump from 3 lines to 2 when the reel landed (the
+              headline scales up faster than the container until lg) */}
           <h1 className="type-display text-5xl sm:text-7xl md:text-8xl">
             flashcards
             <br />
             for{" "}
+            <br className="lg:hidden" />
             <span className="whitespace-nowrap text-coral">
               <WordSpinner words={SPINNER_WORDS} settleOn="anything" />
               {/* breathing room — the g's ink and the period abut at this tracking */}
