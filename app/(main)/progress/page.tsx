@@ -72,9 +72,7 @@ export default async function ProgressPage() {
       {/* SRS distribution */}
       <section className="mt-10">
         <p className="label-caps mb-3 text-muted">Card states</p>
-        {/* 2px inset + gaps: the ink mastered segment must read as a data
-            block, not a smudge against the ink frame */}
-        <div className="flex h-8 w-full gap-[2px] border-[1.5px] border-line p-[2px]">
+        <div className="flex h-8 w-full border-[1.5px] border-line">
           {distribution
             .filter((d) => d.count > 0)
             .map((d) => (

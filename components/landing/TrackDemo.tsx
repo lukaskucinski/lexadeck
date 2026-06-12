@@ -31,7 +31,7 @@ export function TrackDemo() {
 
       <div className="border-t border-line px-5 py-4">
         <p className="label-caps mb-3 text-muted">where the deck stands</p>
-        <div className="flex h-3 w-full gap-[2px]">
+        <div className="flex h-3 w-full">
           {DEMO_STATS.distribution.map((seg) => (
             <div
               key={seg.state}
