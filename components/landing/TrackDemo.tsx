@@ -6,7 +6,6 @@ import { srsStateVar } from "@/lib/wordTypeColors";
 /** The dashboard's progress story with sample numbers: heatmap, streak, mix. */
 export function TrackDemo() {
   const activity = demoActivity(95);
-  const total = DEMO_STATS.distribution.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <div className="border-[1.5px] border-line">
@@ -32,13 +31,16 @@ export function TrackDemo() {
 
       <div className="border-t border-line px-5 py-4">
         <p className="label-caps mb-3 text-muted">where the deck stands</p>
-        <div className="flex h-3 w-full">
+        <div className="flex h-3 w-full gap-[2px]">
           {DEMO_STATS.distribution.map((seg) => (
             <div
               key={seg.state}
+              // flex-grow weights, not % widths — rounded percentages
+              // leave a subpixel gap at the bar's right edge
               style={{
+                flexGrow: seg.count,
+                flexBasis: 0,
                 background: srsStateVar(seg.state),
-                width: `${(seg.count / total) * 100}%`,
               }}
             />
           ))}

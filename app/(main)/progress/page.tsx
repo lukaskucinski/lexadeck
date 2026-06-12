@@ -72,15 +72,20 @@ export default async function ProgressPage() {
       {/* SRS distribution */}
       <section className="mt-10">
         <p className="label-caps mb-3 text-muted">Card states</p>
-        <div className="flex h-8 w-full border-[1.5px] border-line">
+        {/* 2px inset + gaps: the ink mastered segment must read as a data
+            block, not a smudge against the ink frame */}
+        <div className="flex h-8 w-full gap-[2px] border-[1.5px] border-line p-[2px]">
           {distribution
             .filter((d) => d.count > 0)
             .map((d) => (
               <div
                 key={d.state}
                 title={`${SRS_STATE_LABELS[d.state]}: ${d.count}`}
+                // flex-grow weights, not % widths — rounded percentages
+                // leave a subpixel gap at the bar's right edge
                 style={{
-                  width: `${(d.count / Math.max(1, totalCards)) * 100}%`,
+                  flexGrow: d.count,
+                  flexBasis: 0,
                   background: srsStateVar(d.state),
                 }}
               />
