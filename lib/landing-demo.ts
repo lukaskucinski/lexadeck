@@ -50,13 +50,13 @@ export const DEMO_ENRICH = {
 
 /** Headline numbers for the "track" section. */
 export const DEMO_STATS = {
-  reviews: 2418,
-  mastered: 184,
+  reviews: 1208,
+  mastered: 384,
   distribution: [
     { state: "new" as const, count: 96 },
     { state: "learning" as const, count: 41 },
-    { state: "scheduled" as const, count: 612 },
-    { state: "mastered" as const, count: 184 },
+    { state: "scheduled" as const, count: 55 },
+    { state: "mastered" as const, count: 384 },
   ],
 };
 
