@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { searchCards, type SearchHit } from "@/lib/actions/search";
+import { sanitizeEmoji } from "@/lib/emoji";
 
 interface NavEntry {
   type: "nav";
@@ -133,10 +134,12 @@ export function CommandPalette() {
                 </button>
               );
             }
+            // legacy rows may hold non-emoji values; never render tofu
+            const emoji = sanitizeEmoji(entry.hit.emoji);
             return (
               <button key={entry.hit.id} className={base} onClick={() => go(entry)} onMouseEnter={() => setIndex(i)}>
                 <span className="type-term">{entry.hit.term}</span>
-                {entry.hit.emoji && <span>{entry.hit.emoji}</span>}
+                {emoji && <span>{emoji}</span>}
                 <span className={`truncate text-[0.8rem] ${active ? "text-bg/70" : "text-muted"}`}>
                   {entry.hit.translation}
                 </span>

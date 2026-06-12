@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
+import { sanitizeEmoji } from "@/lib/emoji";
 import { STABILITY_HINT } from "@/lib/srs";
 import { WORD_TYPE_LABELS } from "@/lib/types";
 import type { StudyCard } from "@/lib/study";
@@ -39,6 +40,8 @@ export function FlashCard({
   const accent = wordTypeVar(card.wordType);
   const prompt = reversed ? card.translation! : card.term;
   const promptLang = reversed ? "en" : card.language;
+  // legacy rows may hold non-emoji values; never render tofu
+  const emoji = sanitizeEmoji(card.emoji);
 
   return (
     <div className="perspective-1200 w-full">
@@ -95,7 +98,7 @@ export function FlashCard({
           <div className="flex items-center gap-3 border-b border-line px-5 py-3">
             <i className="h-3 w-3" style={{ background: accent }} />
             <span className="type-term text-lg leading-none">{prompt}</span>
-            {card.emoji && <span className="text-lg leading-none">{card.emoji}</span>}
+            {emoji && <span className="text-lg leading-none">{emoji}</span>}
             <span className="label-caps ml-auto text-muted">
               {WORD_TYPE_LABELS[card.wordType]}
               {card.gender && ` · ${GENDER_LABEL[card.gender]}`}

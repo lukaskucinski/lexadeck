@@ -195,7 +195,7 @@ export async function geminiEnrich(cards: EnrichableCard[]): Promise<EnrichmentI
 For EACH card below, produce:
 - "example": one natural, useful Spanish sentence (8-14 words) using the term in a common context. Match the term's register. For expressions, use the expression naturally.
 - "exampleEn": a natural English translation of that sentence.
-- "emoji": exactly one emoji that best evokes the term's meaning ("" if nothing fits).
+- "emoji": exactly one standard Unicode emoji character that best evokes the term's meaning ("" if nothing fits). Never use letters, words, or keycap combinations — a real emoji or "".
 
 Do not contradict the given translation. Return a JSON array with one object per card, carrying the same "id".
 

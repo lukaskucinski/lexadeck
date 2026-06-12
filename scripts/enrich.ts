@@ -21,6 +21,7 @@ import {
   type EnrichmentItem,
 } from "../lib/ai/enrichment";
 import { prisma } from "../lib/db";
+import { sanitizeEmoji } from "../lib/emoji";
 
 const { values: args } = parseArgs({
   options: {
@@ -123,7 +124,7 @@ async function passGemini(): Promise<void> {
           data: {
             example: item.example.trim() || null,
             exampleEn: item.exampleEn.trim() || null,
-            emoji: item.emoji.trim() || null,
+            emoji: sanitizeEmoji(item.emoji),
             enrichedAt: new Date(),
           },
         });
