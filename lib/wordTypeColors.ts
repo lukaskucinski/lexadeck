@@ -24,7 +24,7 @@ export const SRS_STATE_COLOR: Record<SRSState, string> = {
   learning: "amber",
   due: "coral",
   scheduled: "green",
-  mastered: "teal",
+  mastered: "ink", // terminal state: set in stone — and unmistakable next to green
 };
 
 export function wordTypeVar(wordType: WordType): string {

@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sanitizeEmoji } from "@/lib/emoji";
 import { getSRSState, STABILITY_HINT } from "@/lib/srs";
 import type { Gender, WordType } from "@/lib/types";
 
@@ -31,6 +32,8 @@ export default async function CardDetailPage({
   if (!card || card.deckId !== id) notFound();
 
   const srs = getSRSState(card);
+  // legacy rows may hold non-emoji values; never render tofu
+  const emoji = sanitizeEmoji(card.emoji);
 
   return (
     <div className="max-w-3xl">
@@ -56,7 +59,7 @@ export default async function CardDetailPage({
           <h1 className="type-display text-5xl md:text-6xl">
             {card.term}
             <SpeakButton text={card.term} lang={card.language} size={26} className="ml-4 align-middle" />
-            {card.emoji && <span className="ml-4 align-middle text-4xl">{card.emoji}</span>}
+            {emoji && <span className="ml-4 align-middle text-4xl">{emoji}</span>}
           </h1>
           <p className="mt-4 text-2xl font-medium tracking-tight">
             {card.translation ?? <span className="text-muted/60">no translation yet</span>}

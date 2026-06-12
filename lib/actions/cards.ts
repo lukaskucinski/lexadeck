@@ -6,6 +6,7 @@ import { z } from "zod";
 import { geminiEnrich, translateBatch } from "@/lib/ai/enrichment";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sanitizeEmoji } from "@/lib/emoji";
 import { emptySchedulerFields } from "@/lib/srs";
 import { CardType, Gender, WordType } from "@/lib/types";
 import type { ActionState } from "./decks";
@@ -34,7 +35,10 @@ const cardSchema = z.object({
   conjugation: optional(2000),
   example: optional(500),
   exampleEn: optional(500),
-  emoji: optional(16),
+  emoji: optional(16).refine(
+    (v) => v === null || sanitizeEmoji(v) !== null,
+    "Emoji field accepts 1–3 emoji only",
+  ),
 });
 
 function cardDataFromForm(formData: FormData) {
@@ -192,7 +196,8 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
         translation,
         example: item.example.trim() || card.example,
         exampleEn: item.exampleEn.trim() || card.exampleEn,
-        emoji: item.emoji.trim() || card.emoji,
+        // Gemini sometimes returns non-emoji symbols that render as tofu
+        emoji: sanitizeEmoji(item.emoji) ?? card.emoji,
         enrichedAt: new Date(),
       },
     });

@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { sanitizeEmoji } from "@/lib/emoji";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { CardActionsMenu } from "./CardActionsMenu";
 import type { CardRow } from "./cardRow";
 
 export function FlashCardPreview({ card }: { card: CardRow }) {
+  // legacy rows may hold non-emoji values; never render tofu
+  const emoji = sanitizeEmoji(card.emoji);
   return (
     <div className="group relative">
       <Link
@@ -26,7 +29,7 @@ export function FlashCardPreview({ card }: { card: CardRow }) {
         <div className="flex flex-1 flex-col justify-center px-3.5 py-3">
           <div className="type-term text-xl leading-tight">
             {card.term}
-            {card.emoji && <span className="ml-2 text-base">{card.emoji}</span>}
+            {emoji && <span className="ml-2 text-base">{emoji}</span>}
           </div>
           <div className="mt-1 truncate text-[0.82rem] font-medium text-muted">
             {card.translation ?? "—"}

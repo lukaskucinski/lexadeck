@@ -9,9 +9,28 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
+  // absolute URLs for og:image etc. — link-preview scrapers require them
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://lexadeck.vercel.app",
+  ),
   title: "LexaDeck",
-  description: "Typographic flashcard language learning",
+  description:
+    "Flashcards for anything — FSRS spaced repetition, AI-enriched cards, typographic design.",
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "LexaDeck",
+    description:
+      "Flashcards for anything — FSRS spaced repetition, AI-enriched cards, typographic design.",
+    url: "/",
+    siteName: "LexaDeck",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LexaDeck",
+    description:
+      "Flashcards for anything — FSRS spaced repetition, AI-enriched cards, typographic design.",
+  },
 };
 
 export const viewport: Viewport = {

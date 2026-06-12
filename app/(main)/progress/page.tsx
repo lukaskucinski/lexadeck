@@ -79,8 +79,11 @@ export default async function ProgressPage() {
               <div
                 key={d.state}
                 title={`${SRS_STATE_LABELS[d.state]}: ${d.count}`}
+                // flex-grow weights, not % widths — rounded percentages
+                // leave a subpixel gap at the bar's right edge
                 style={{
-                  width: `${(d.count / Math.max(1, totalCards)) * 100}%`,
+                  flexGrow: d.count,
+                  flexBasis: 0,
                   background: srsStateVar(d.state),
                 }}
               />

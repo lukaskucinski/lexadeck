@@ -6,6 +6,7 @@ import { Heatmap } from "@/components/ui/Heatmap";
 import { DeckTile } from "@/components/deck/DeckTile";
 import { requireUser } from "@/lib/auth";
 import { LAST_DECK_COOKIE } from "@/lib/decks";
+import { sanitizeEmoji } from "@/lib/emoji";
 import { greetingFor, resolveGreetingLanguage } from "@/lib/greeting";
 import { resolveSubjectWord } from "@/lib/spinner";
 import { getDeckSummaries } from "@/lib/queries";
@@ -104,16 +105,20 @@ export default async function DashboardPage() {
           <div>
             <p className="label-caps mb-3 text-muted">Recently added</p>
             <div className="flex flex-wrap gap-2">
-              {recent.map((card) => (
-                <Link
-                  key={card.id}
-                  href={`/decks/${card.deckId}/cards/${card.id}`}
-                  className="max-w-60 truncate border-[1.5px] border-line px-3 py-1.5 text-[0.8rem] font-bold transition-colors hover:bg-ink hover:text-bg"
-                >
-                  {card.emoji && <span className="mr-1.5">{card.emoji}</span>}
-                  {card.term}
-                </Link>
-              ))}
+              {recent.map((card) => {
+                // legacy rows may hold non-emoji values; never render tofu
+                const emoji = sanitizeEmoji(card.emoji);
+                return (
+                  <Link
+                    key={card.id}
+                    href={`/decks/${card.deckId}/cards/${card.id}`}
+                    className="max-w-60 truncate border-[1.5px] border-line px-3 py-1.5 text-[0.8rem] font-bold transition-colors hover:bg-ink hover:text-bg"
+                  >
+                    {emoji && <span className="mr-1.5">{emoji}</span>}
+                    {card.term}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
