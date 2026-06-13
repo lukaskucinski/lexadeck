@@ -277,14 +277,14 @@ For EACH card below, return one JSON object carrying the same "id", with these f
 - "example": one natural, useful Spanish sentence (8-14 words) using the term in a common context. Match the term's register. For expressions, use the expression naturally.
 - "exampleEn": a natural English translation of that sentence.
 - "emoji": exactly one standard Unicode emoji character that best evokes the term's meaning ("" if nothing fits). Never use letters, words, or keycap combinations — a real emoji or "".
-- "usagePattern": the grammatical frame the term is typically used in, e.g. "gozar de + noun" or "soñar con algo". "" if there is no characteristic pattern.
+- "usagePattern": the grammatical frame the term is typically used in, e.g. "gozar de + noun" or "soñar con algo". Use English grammatical labels (write "+ noun", not "+ sustantivo"). "" if there is no characteristic pattern.
 - "collocations": 3-5 short, natural word combinations the term commonly appears in (e.g. "gozar de buena salud"). [] if none are characteristic.
 - "conjugation": for VERBS only, a compact present-tense summary with yo/tú/él/nosotros/ellos forms on separate lines, noting any key irregular forms. "" for non-verbs.
-- "etymology": a brief one-sentence origin note. Return "" unless you are confident — never guess.
+- "etymology": a brief one-sentence origin note written in ENGLISH (the learner reads English), e.g. "From Latin 'nepos', meaning nephew or grandson." Return "" unless you are confident — never guess.
 - "wordFamily": 2-4 closely related words sharing the same root, e.g. ["gozo","gozoso"]. [] if none.
-- "correction": "" in almost all cases. ONLY if the term or its given translation is clearly MISSPELLED — not merely a regional or stylistic variant — return a short note naming the likely intended form, e.g. "'recivir' looks misspelled — did you mean 'recibir'?". Respect valid regional spellings and accents; never flag a correct word.
+- "correction": "" in almost all cases. ONLY if the term or its given translation is clearly MISSPELLED — not merely a regional or stylistic variant — return a short ENGLISH note naming the likely intended form, e.g. "'recivir' looks misspelled — did you mean 'recibir'?". Respect valid regional spellings and accents; never flag a correct word.
 
-Do not contradict the given translation. Keep every field concise and practical for a learner. Return a JSON array with one object per card.
+Do not contradict the given translation. Write the explanatory fields — "etymology" and any "correction" — in ENGLISH for the English-speaking learner; only the target-language content ("example", "collocations", "conjugation", "wordFamily") is in Spanish. Keep every field concise and practical. Return a JSON array with one object per card.
 
 Cards:
 ${cardLines.join("\n")}`;
