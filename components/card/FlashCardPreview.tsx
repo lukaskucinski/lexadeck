@@ -1,26 +1,33 @@
+"use client";
+
 import Link from "next/link";
 import { sanitizeEmoji } from "@/lib/emoji";
+import { toggleSelection } from "@/lib/selectionStore";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
+import { useIsSelected } from "@/components/deck/useDeckSelection";
 import { CardActionsMenu } from "./CardActionsMenu";
-import { CardSelectCheckbox } from "./CardSelectCheckbox";
 import type { CardRow } from "./cardRow";
 
 export function FlashCardPreview({ card, selectionKey }: { card: CardRow; selectionKey?: string }) {
   // legacy rows may hold non-emoji values; never render tofu
   const emoji = sanitizeEmoji(card.emoji);
+  const selected = useIsSelected(selectionKey ?? "", card.id);
+
   return (
     <div className="group relative">
-      {selectionKey && (
-        <CardSelectCheckbox
-          selectionKey={selectionKey}
-          cardId={card.id}
-          className="absolute top-2 left-2 z-10 bg-bg"
-        />
-      )}
       <Link
         href={`/decks/${card.deckId}/cards/${card.id}`}
-        className="flex min-h-36 flex-col border-[1.5px] border-line bg-bg transition-colors hover:bg-soft/30"
+        onClick={(e) => {
+          // shift-click selects instead of opening
+          if (selectionKey && e.shiftKey) {
+            e.preventDefault();
+            toggleSelection(selectionKey, card.id, card.wordType);
+          }
+        }}
+        className={`flex min-h-36 flex-col border-[1.5px] bg-bg transition-colors hover:bg-soft/30 ${
+          selected ? "border-ink ring-1 ring-ink" : "border-line"
+        }`}
       >
         <div className="flex items-center justify-between gap-2 border-b border-soft px-3.5 py-2">
           <span className="label-caps inline-flex items-center gap-2 text-muted">

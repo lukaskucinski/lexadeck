@@ -135,11 +135,9 @@ export function CardListTable({
     else setParams({ sort: key, dir: "asc" }, { resetPage: false });
   }
 
-  function toggle(id: string) {
-    if (usingShared) {
-      shared.toggle(id);
-      return;
-    }
+  // library (local) selection via checkboxes; the deck (shared) view selects by
+  // shift-click on the row instead
+  function toggleLocal(id: string) {
     setLocalSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -152,27 +150,26 @@ export function CardListTable({
 
   function toggleAll() {
     const ids = cards.map((c) => c.id);
-    if (usingShared) shared.setMany(ids, !allSelected);
-    else setLocalSelected(allSelected ? new Set() : new Set(ids));
+    setLocalSelected(allSelected ? new Set() : new Set(ids));
   }
 
   return (
     <div className="border-[1.5px] border-line">
-      {!usingShared && selected.size > 0 && (
+      {!usingShared && localSelected.size > 0 && (
         <div className="flex items-center justify-between border-b border-line bg-soft/40 px-4 py-2">
-          <span className="label-caps text-ink">{selected.size} selected</span>
+          <span className="label-caps text-ink">{localSelected.size} selected</span>
           <Button
             variant="danger"
             disabled={pending}
             className="h-8 px-3 text-[0.66rem]"
             onClick={() =>
               startTransition(async () => {
-                await deleteCards([...selected]);
+                await deleteCards([...localSelected]);
                 setLocalSelected(new Set());
               })
             }
           >
-            {pending ? "Deleting…" : `Delete ${selected.size}`}
+            {pending ? "Deleting…" : `Delete ${localSelected.size}`}
           </Button>
         </div>
       )}
@@ -184,14 +181,16 @@ export function CardListTable({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-line text-left">
-            <th className="w-10 px-3 py-2.5">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleAll}
-                className="accent-[var(--c-ink)]"
-              />
-            </th>
+            {!usingShared && (
+              <th className="w-10 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  className="accent-[var(--c-ink)]"
+                />
+              </th>
+            )}
             <th className="px-3 py-2.5"><SortHeader id="term" sort={sort} dir={dir} onToggle={toggleSort}>Term</SortHeader></th>
             <th className="px-3 py-2.5"><span className="label-caps text-muted">Translation</span></th>
             {showDeck && <th className="hidden px-3 py-2.5 md:table-cell"><span className="label-caps text-muted">Deck</span></th>}
@@ -205,18 +204,29 @@ export function CardListTable({
           {cards.map((card) => (
             <tr
               key={card.id}
-              onClick={() => router.push(`/decks/${card.deckId}/cards/${card.id}`)}
-              className="cursor-pointer border-b border-soft last:border-b-0 hover:bg-soft/25"
+              onClick={(e) => {
+                // deck view: shift-click selects; otherwise open the card
+                if (usingShared && e.shiftKey) {
+                  shared.toggle(card.id, card.wordType);
+                  return;
+                }
+                router.push(`/decks/${card.deckId}/cards/${card.id}`);
+              }}
+              className={`cursor-pointer border-b border-soft last:border-b-0 ${
+                usingShared && selected.has(card.id) ? "bg-soft" : "hover:bg-soft/25"
+              }`}
             >
               {/* interactive cells swallow the row click */}
-              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(card.id)}
-                  onChange={() => toggle(card.id)}
-                  className="accent-[var(--c-ink)]"
-                />
-              </td>
+              {!usingShared && (
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(card.id)}
+                    onChange={() => toggleLocal(card.id)}
+                    className="accent-[var(--c-ink)]"
+                  />
+                </td>
+              )}
               <td className="px-3 py-2 font-bold" onClick={(e) => e.stopPropagation()}>
                 <EditableCell cardId={card.id} field="term" value={card.term} />
               </td>

@@ -30,10 +30,11 @@ export function DeckSelectionBar({
   const count = selected.size;
   if (count === 0) return null;
   const busy = enrich.running || deleting;
+  const hasVerb = [...selected.values()].some((wt) => wt === "VERB");
 
   async function startEnrich() {
     enrich.reset();
-    const res = await resolveEnrichSelection(deckId, [...selected]);
+    const res = await resolveEnrichSelection(deckId, [...selected.keys()]);
     if (res.error || !res.resolved) {
       enrich.fail(res.error ?? "Could not resolve the selection");
       return;
@@ -58,7 +59,7 @@ export function DeckSelectionBar({
 
   function deleteSelected() {
     startDelete(async () => {
-      await deleteCards([...selected]);
+      await deleteCards([...selected.keys()]);
       clear();
     });
   }
@@ -75,7 +76,7 @@ export function DeckSelectionBar({
             </Button>
           ) : (
             <>
-              {enrichEnabled && (
+              {enrichEnabled && hasVerb && (
                 <label
                   className={`flex items-center gap-1.5 text-[0.7rem] font-semibold ${
                     busy ? "opacity-40" : "cursor-pointer text-muted"

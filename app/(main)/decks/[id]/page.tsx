@@ -163,7 +163,10 @@ export default async function DeckDetailPage({
       </header>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <ViewToggle active={vp.view} />
+        <div className="flex items-center gap-3">
+          <ViewToggle active={vp.view} />
+          <span className="label-caps hidden text-muted/60 lg:inline">⇧-click to select</span>
+        </div>
         <div className="flex items-center gap-3">
           <SearchBar />
           <FilterPanel />

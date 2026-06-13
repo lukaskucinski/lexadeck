@@ -212,6 +212,24 @@ export async function setCardWordType(
   revalidateCardPaths(card.deckId);
 }
 
+/** Kanban multi-card drag: reclassify a whole selection at once (ownership-scoped). */
+export async function setCardsWordType(
+  cardIds: string[],
+  wordType: WordType,
+): Promise<void> {
+  if (cardIds.length === 0) return;
+  const user = await requireUser();
+  const owned = { deck: { userId: user.id } };
+  const data: { wordType: WordType; gender?: null } = { wordType };
+  if (wordType !== "NOUN") data.gender = null;
+  const first = await prisma.card.findFirst({
+    where: { id: cardIds[0], ...owned },
+    select: { deckId: true },
+  });
+  await prisma.card.updateMany({ where: { id: { in: cardIds }, ...owned }, data });
+  if (first) revalidateCardPaths(first.deckId);
+}
+
 /**
  * Build the `Card.update` data for an enrichment result, mirroring the safe
  * re-enrich rules: regenerate the detail layer but preserve any on-demand

@@ -4,18 +4,17 @@ import { useMemo, useSyncExternalStore } from "react";
 import {
   clearSelection,
   getSelectionSnapshot,
-  setSelection,
   subscribeSelection,
   toggleSelection,
 } from "@/lib/selectionStore";
 
-const EMPTY: ReadonlySet<string> = new Set<string>();
+const EMPTY: ReadonlyMap<string, string> = new Map<string, string>();
 
 export interface DeckSelection {
-  selected: ReadonlySet<string>;
+  /** cardId → wordType for every selected card */
+  selected: ReadonlyMap<string, string>;
   isSelected: (id: string) => boolean;
-  toggle: (id: string) => void;
-  setMany: (ids: string[], on: boolean) => void;
+  toggle: (id: string, wordType: string) => void;
   clear: () => void;
 }
 
@@ -34,10 +33,21 @@ export function useDeckSelection(key: string): DeckSelection {
     () => ({
       selected,
       isSelected: (id) => selected.has(id),
-      toggle: (id) => toggleSelection(key, id),
-      setMany: (ids, on) => setSelection(key, ids, on),
+      toggle: (id, wordType) => toggleSelection(key, id, wordType),
       clear: () => clearSelection(key),
     }),
     [selected, key],
+  );
+}
+
+/**
+ * Subscribe to ONLY one card's selected state (a boolean) so toggling a card
+ * doesn't re-render every other card. For the per-card highlight in grid/kanban.
+ */
+export function useIsSelected(key: string, id: string): boolean {
+  return useSyncExternalStore(
+    subscribeSelection,
+    () => getSelectionSnapshot(key).has(id),
+    () => false,
   );
 }
