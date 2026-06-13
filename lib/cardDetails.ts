@@ -5,7 +5,8 @@
  * display-only — never queried or filtered — so one JSON column beats a column
  * per field. Always read through getCardDetails (legacy rows are null).
  */
-import type { EnrichmentItem } from "./ai/enrichment";
+import type { EnrichmentItem, Synonym } from "./ai/enrichment";
+import type { ConjTable } from "./conjugation";
 
 // A `type` (not `interface`) so TS gives it an implicit index signature and it
 // stays assignable to Prisma's Json input type at the write sites.
@@ -14,6 +15,9 @@ export type CardDetails = {
   collocations?: string[];
   etymology?: string;
   wordFamily?: string[];
+  synonyms?: Synonym[];
+  /** Full verb conjugation table, generated on demand by conjugateVerb. */
+  conjugationTable?: ConjTable;
   /** Non-destructive "did you mean…?" flag; cleared when term/translation changes. */
   correction?: string;
 };
@@ -38,6 +42,7 @@ export function detailsFromEnrichment(item: EnrichmentItem): CardDetails {
   if (item.collocations.length) d.collocations = item.collocations;
   if (item.etymology) d.etymology = item.etymology;
   if (item.wordFamily.length) d.wordFamily = item.wordFamily;
+  if (item.synonyms.length) d.synonyms = item.synonyms;
   if (item.correction) d.correction = item.correction;
   return d;
 }
@@ -57,6 +62,21 @@ export function getCardDetails(raw: unknown): CardDetails {
   if (list(r.collocations).length) out.collocations = list(r.collocations);
   if (str(r.etymology)) out.etymology = str(r.etymology);
   if (list(r.wordFamily).length) out.wordFamily = list(r.wordFamily);
+  const syns = Array.isArray(r.synonyms)
+    ? r.synonyms
+        .map((x) => {
+          const o = (x ?? {}) as Record<string, unknown>;
+          return {
+            es: typeof o.es === "string" ? o.es.trim() : "",
+            en: typeof o.en === "string" ? o.en.trim() : "",
+          };
+        })
+        .filter((s) => s.es && s.en)
+    : [];
+  if (syns.length) out.synonyms = syns;
+  if (r.conjugationTable && typeof r.conjugationTable === "object" && !Array.isArray(r.conjugationTable)) {
+    out.conjugationTable = r.conjugationTable as ConjTable;
+  }
   if (str(r.correction)) out.correction = str(r.correction);
   return out;
 }

@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { geminiEnrich, normalizeEnrichment, translateBatch } from "@/lib/ai/enrichment";
+import {
+  geminiConjugate,
+  geminiEnrich,
+  normalizeEnrichment,
+  translateBatch,
+} from "@/lib/ai/enrichment";
 import { requireUser } from "@/lib/auth";
 import {
   detailsFromEnrichment,
@@ -11,6 +16,7 @@ import {
   getCardDetails,
   withoutCorrection,
 } from "@/lib/cardDetails";
+import { buildConjugationTable, type ConjTable, normalizeSimpleConjugation } from "@/lib/conjugation";
 import { prisma } from "@/lib/db";
 import { sanitizeEmoji } from "@/lib/emoji";
 import { emptySchedulerFields } from "@/lib/srs";
@@ -237,6 +243,12 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
     if (!raw) return { error: "The AI returned no enrichment for this card" };
     const item = normalizeEnrichment(raw);
 
+    // re-enriching regenerates the detail layer, but keep a previously-built
+    // full conjugation table (it's generated separately, on demand)
+    const details = detailsFromEnrichment(item);
+    const priorTable = getCardDetails(card.details).conjugationTable;
+    if (priorTable) details.conjugationTable = priorTable;
+
     await prisma.card.update({
       where: { id: cardId },
       data: {
@@ -246,7 +258,7 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
         // item.emoji is pre-sanitized ("" when not a real emoji) — keep existing if empty
         emoji: item.emoji || card.emoji,
         conjugation: item.conjugation || card.conjugation,
-        details: detailsFromEnrichment(item),
+        details,
         // classification (wordType/gender) is left to the user — never overwritten here
         enrichedAt: new Date(),
       },
@@ -306,6 +318,42 @@ export async function previewEnrichment(
         correction: item.correction,
       },
     };
+  } catch (err) {
+    return { error: (err as Error).message.slice(0, 200) };
+  }
+}
+
+/**
+ * Generate (and cache) the full conjugation table for a verb card, on demand.
+ * Gemini returns only the simple forms; lib/conjugation.ts derives every
+ * compound tense from the participle + the fixed `haber` paradigm. Spanish only.
+ */
+export async function conjugateVerb(
+  cardId: string,
+): Promise<{ table?: ConjTable; error?: string }> {
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+    include: { deck: { select: { language: true } } },
+  });
+  if (!card) return { error: "Card not found" };
+  if (card.wordType !== "VERB") return { error: "Only verbs can be conjugated" };
+  if (card.deck.language !== "es") {
+    return { error: "Conjugation currently supports Spanish verbs only" };
+  }
+
+  const existing = getCardDetails(card.details);
+  if (existing.conjugationTable) return { table: existing.conjugationTable };
+
+  try {
+    const raw = await geminiConjugate(card.term);
+    const table = buildConjugationTable(card.term, normalizeSimpleConjugation(raw));
+    await prisma.card.update({
+      where: { id: cardId },
+      data: { details: { ...existing, conjugationTable: table } },
+    });
+    revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
+    return { table };
   } catch (err) {
     return { error: (err as Error).message.slice(0, 200) };
   }

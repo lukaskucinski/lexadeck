@@ -3,7 +3,8 @@
  *   npx tsx scripts/ai-smoke.ts
  */
 import "dotenv/config";
-import { geminiEnrich, normalizeEnrichment } from "../lib/ai/enrichment";
+import { geminiConjugate, geminiEnrich, normalizeEnrichment } from "../lib/ai/enrichment";
+import { buildConjugationTable, normalizeSimpleConjugation } from "../lib/conjugation";
 
 async function testAzure(): Promise<void> {
   const key = process.env.AZURE_TRANSLATOR_KEY;
@@ -45,7 +46,18 @@ async function testGemini(): Promise<void> {
   console.log(`  conjugation:  ${dash(item.conjugation.replace(/\n/g, " / "))}`);
   console.log(`  etymology:    ${dash(item.etymology)}`);
   console.log(`  wordFamily:   ${dash(item.wordFamily.join(" · "))}`);
+  console.log(`  synonyms:     ${dash(item.synonyms.map((s) => `${s.es} (${s.en})`).join(", "))}`);
   console.log(`  correction:   ${dash(item.correction)}`);
+}
+
+async function testConjugation(): Promise<void> {
+  // pedir is the e→i stem-changer the deterministic JS libs got wrong
+  const raw = await geminiConjugate("pedir");
+  const t = buildConjugationTable("pedir", normalizeSimpleConjugation(raw));
+  console.log("GEMINI CONJUGATION OK (pedir):");
+  console.log(`  present:    ${t.indicativePresent.join(", ")}`);
+  console.log(`  participle: ${t.participle}`);
+  console.log(`  pres.perfect (derived): ${t.presentPerfect.join(", ")}`);
 }
 
 async function main() {
@@ -61,6 +73,12 @@ async function main() {
   } catch (err) {
     failed = true;
     console.error("GEMINI FAILED:", (err as Error).message);
+  }
+  try {
+    await testConjugation();
+  } catch (err) {
+    failed = true;
+    console.error("GEMINI CONJUGATION FAILED:", (err as Error).message);
   }
   if (failed) process.exit(1);
   console.log("\nAI SMOKE: PASS");

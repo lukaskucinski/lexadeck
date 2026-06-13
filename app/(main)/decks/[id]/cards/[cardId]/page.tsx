@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { CardStatusActions } from "@/components/card/CardStatusActions";
+import { ConjugationPanel } from "@/components/card/ConjugationPanel";
 import { EnrichButton } from "@/components/card/EnrichButton";
+import { SynonymList } from "@/components/card/SynonymList";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { SpeakButton } from "@/components/ui/SpeakButton";
@@ -118,9 +120,19 @@ export default async function CardDetailPage({
           </div>
         )}
 
+        {card.wordType === "VERB" && card.deck.language === "es" && (
+          <ConjugationPanel cardId={cardId} initialTable={details.conjugationTable} />
+        )}
+
         {details.wordFamily && (
           <Specimen label="Word family">
             <p className="text-sm leading-relaxed">{details.wordFamily.join(" · ")}</p>
+          </Specimen>
+        )}
+
+        {details.synonyms && (
+          <Specimen label="Synonyms">
+            <SynonymList items={details.synonyms} />
           </Specimen>
         )}
 

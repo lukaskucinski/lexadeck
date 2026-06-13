@@ -90,6 +90,13 @@ export async function translateBatch(
 /* Gemini: example sentence + gloss + emoji                            */
 /* ------------------------------------------------------------------ */
 
+/** A Spanish synonym paired with its direct English gloss (shown on hover). */
+// `type` (not `interface`) for an implicit index signature → Prisma Json-assignable.
+export type Synonym = {
+  es: string;
+  en: string;
+};
+
 /** Normalized enrichment for one card. Detail-layer fields are "" / [] when n/a. */
 export interface EnrichmentItem {
   id: string;
@@ -106,6 +113,7 @@ export interface EnrichmentItem {
   conjugation: string;
   etymology: string;
   wordFamily: string[];
+  synonyms: Synonym[];
   correction: string;
 }
 
@@ -141,14 +149,23 @@ const RESPONSE_SCHEMA = {
       conjugation: { type: "STRING" },
       etymology: { type: "STRING" },
       wordFamily: { type: "ARRAY", items: { type: "STRING" } },
+      synonyms: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: { es: { type: "STRING" }, en: { type: "STRING" } },
+          required: ["es", "en"],
+        },
+      },
       correction: { type: "STRING" },
     },
-    required: [...STRING_FIELDS, "collocations", "wordFamily"],
+    required: [...STRING_FIELDS, "collocations", "wordFamily", "synonyms"],
   },
 } as const;
 
 const MAX_COLLOCATIONS = 5;
 const MAX_WORD_FAMILY = 4;
+const MAX_SYNONYMS = 6;
 const WORD_TYPES = new Set<string>(Object.values(WordType));
 const GENDERS = new Set<string>(Object.values(Gender));
 
@@ -161,6 +178,17 @@ function trimList(v: unknown, max: number): string[] {
   return v
     .map((x) => (typeof x === "string" ? x.trim() : ""))
     .filter((x) => x.length > 0)
+    .slice(0, max);
+}
+
+function trimSynonyms(v: unknown, max: number): Synonym[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x) => {
+      const o = (x ?? {}) as Record<string, unknown>;
+      return { es: trimStr(o.es), en: trimStr(o.en) };
+    })
+    .filter((s) => s.es.length > 0 && s.en.length > 0)
     .slice(0, max);
 }
 
@@ -189,6 +217,7 @@ export function normalizeEnrichment(raw: Record<string, unknown>): EnrichmentIte
     conjugation: trimStr(raw.conjugation),
     etymology: trimStr(raw.etymology),
     wordFamily: trimList(raw.wordFamily, MAX_WORD_FAMILY),
+    synonyms: trimSynonyms(raw.synonyms, MAX_SYNONYMS),
     correction: trimStr(raw.correction),
   };
 }
@@ -210,11 +239,13 @@ function isRetryable(err: unknown): boolean {
   );
 }
 
-async function geminiGenerate(
+/** One structured-output request → parsed JSON (array or object per the schema). */
+async function geminiRequest(
   model: string,
   key: string,
   prompt: string,
-): Promise<RawEnrichment[]> {
+  schema: unknown,
+): Promise<unknown> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {
@@ -224,7 +255,7 @@ async function geminiGenerate(
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+          responseSchema: schema,
           temperature: 0.4,
         },
       }),
@@ -239,10 +270,17 @@ async function geminiGenerate(
   };
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Gemini returned no content");
+  return JSON.parse(text);
+}
 
-  const parsed = JSON.parse(text) as RawEnrichment[];
+async function geminiGenerate(
+  model: string,
+  key: string,
+  prompt: string,
+): Promise<RawEnrichment[]> {
+  const parsed = await geminiRequest(model, key, prompt, RESPONSE_SCHEMA);
   if (!Array.isArray(parsed)) throw new Error("Gemini response is not an array");
-  return parsed;
+  return parsed as RawEnrichment[];
 }
 
 export async function geminiEnrich(cards: EnrichableCard[]): Promise<RawEnrichment[]> {
@@ -282,6 +320,7 @@ For EACH card below, return one JSON object carrying the same "id", with these f
 - "conjugation": for VERBS only, a compact present-tense summary with yo/tú/él/nosotros/ellos forms on separate lines, noting any key irregular forms. "" for non-verbs.
 - "etymology": a brief one-sentence origin note written in ENGLISH (the learner reads English), e.g. "From Latin 'nepos', meaning nephew or grandson." Return "" unless you are confident — never guess.
 - "wordFamily": 2-4 closely related words sharing the same root, e.g. ["gozo","gozoso"]. [] if none.
+- "synonyms": 2-6 Spanish synonyms or near-synonyms, each as {"es": <the Spanish synonym>, "en": <its own short, direct English translation>}. e.g. for "gozar": [{"es":"disfrutar","en":"to enjoy"},{"es":"deleitarse","en":"to delight in"}]. The "en" is that synonym's gloss, not the headword's. [] if there are no good synonyms (e.g. proper nouns).
 - "correction": "" in almost all cases. ONLY if the term or its given translation is clearly MISSPELLED — not merely a regional or stylistic variant — return a short ENGLISH note naming the likely intended form, e.g. "'recivir' looks misspelled — did you mean 'recibir'?". Respect valid regional spellings and accents; never flag a correct word.
 
 Do not contradict the given translation. Write the explanatory fields — "etymology" and any "correction" — in ENGLISH for the English-speaking learner; only the target-language content ("example", "collocations", "conjugation", "wordFamily") is in Spanish. Keep every field concise and practical. Return a JSON array with one object per card.
@@ -297,6 +336,80 @@ ${cardLines.join("\n")}`;
         `Gemini ${model} unavailable (${(err as Error).message.slice(0, 120)}…) — retrying with ${fallback}`,
       );
       return geminiGenerate(fallback, key, prompt);
+    }
+    throw err;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Gemini: full verb conjugation (simple forms only; compounds derived) */
+/* ------------------------------------------------------------------ */
+
+const sixForms = { type: "ARRAY", items: { type: "STRING" } } as const;
+
+const CONJ_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    gerund: { type: "STRING" },
+    participle: { type: "STRING" },
+    indicativePresent: sixForms,
+    indicativePreterite: sixForms,
+    indicativeImperfect: sixForms,
+    indicativeFuture: sixForms,
+    conditional: sixForms,
+    subjunctivePresent: sixForms,
+    subjunctiveImperfectRa: sixForms,
+    subjunctiveImperfectSe: sixForms,
+    imperativeAffirmative: sixForms,
+    imperativeNegative: sixForms,
+  },
+  required: [
+    "gerund", "participle", "indicativePresent", "indicativePreterite",
+    "indicativeImperfect", "indicativeFuture", "conditional", "subjunctivePresent",
+    "subjunctiveImperfectRa", "subjunctiveImperfectSe", "imperativeAffirmative",
+    "imperativeNegative",
+  ],
+} as const;
+
+/**
+ * Conjugate a Spanish verb (infinitive) → the SIMPLE forms as a raw object.
+ * Compound/perfect tenses are NOT requested — lib/conjugation.ts derives them
+ * deterministically from the participle + the fixed `haber` paradigm.
+ * Run the result through normalizeSimpleConjugation + buildConjugationTable.
+ */
+export async function geminiConjugate(verb: string): Promise<Record<string, unknown>> {
+  const key = env("GEMINI_API_KEY");
+  const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
+  const fallback = env("GEMINI_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
+  if (!key) throw new Error("GEMINI_API_KEY is not set");
+
+  const prompt = `Conjugate the Spanish verb "${verb}" (infinitive). Return JSON with the SIMPLE forms only — do NOT include compound/perfect tenses (they are derived separately).
+Each finite tense is an array of EXACTLY 6 forms in this person order: [yo, tú, él/ella/usted, nosotros, vosotros, ellos/ellas/ustedes].
+- "gerund": the gerundio (e.g. "hablando").
+- "participle": the past participle, using the irregular form when applicable (e.g. escribir → "escrito").
+- "indicativePresent", "indicativePreterite", "indicativeImperfect", "indicativeFuture": indicative simple tenses (6 each).
+- "conditional": simple conditional (6).
+- "subjunctivePresent": present subjunctive (6).
+- "subjunctiveImperfectRa": imperfect subjunctive, -ra forms (6).
+- "subjunctiveImperfectSe": imperfect subjunctive, -se forms (6).
+- "imperativeAffirmative": affirmative imperative, EXACTLY 5 forms in order [tú, usted, nosotros, vosotros, ustedes].
+- "imperativeNegative": negative imperative, EXACTLY 5 forms in the same order, each starting with "no ".
+Use standard Castilian Spanish (include vosotros). Apply every stem change and irregularity correctly (e.g. pedir → "pido", volver → "vuelvo" in the present but "volvería" in the conditional).`;
+
+  const run = (m: string) => geminiRequest(m, key, prompt, CONJ_SCHEMA);
+  const toObj = (parsed: unknown): Record<string, unknown> =>
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+
+  try {
+    return toObj(await run(model));
+  } catch (err) {
+    if (fallback && fallback !== model && isRetryable(err)) {
+      console.warn(
+        `Gemini ${model} unavailable (${(err as Error).message.slice(0, 120)}…) — retrying with ${fallback}`,
+      );
+      return toObj(await run(fallback));
     }
     throw err;
   }

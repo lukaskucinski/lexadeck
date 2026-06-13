@@ -104,6 +104,7 @@ describe("normalizeEnrichment", () => {
       conjugation: "gozo, gozas, goza",
       etymology: "From Latin gaudēre.",
       wordFamily: ["gozo", "gozoso"],
+      synonyms: [{ es: "disfrutar", en: "to enjoy" }],
       correction: "",
     });
     expect(out).toEqual({
@@ -118,8 +119,22 @@ describe("normalizeEnrichment", () => {
       conjugation: "gozo, gozas, goza",
       etymology: "From Latin gaudēre.",
       wordFamily: ["gozo", "gozoso"],
+      synonyms: [{ es: "disfrutar", en: "to enjoy" }],
       correction: "",
     });
+  });
+
+  it("normalizes synonyms, dropping entries missing es or en", () => {
+    const out = normalizeEnrichment({
+      id: "c1",
+      synonyms: [
+        { es: " disfrutar ", en: " to enjoy " },
+        { es: "deleitarse", en: "" }, // dropped — no gloss
+        { es: "", en: "to revel" }, // dropped — no term
+        "garbage", // dropped — not an object
+      ],
+    });
+    expect(out.synonyms).toEqual([{ es: "disfrutar", en: "to enjoy" }]);
   });
 
   it("trims string fields", () => {
@@ -195,6 +210,7 @@ describe("normalizeEnrichment", () => {
       conjugation: "",
       etymology: "",
       wordFamily: [],
+      synonyms: [],
       correction: "",
     });
   });

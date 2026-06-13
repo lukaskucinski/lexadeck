@@ -14,6 +14,7 @@ const base: EnrichmentItem = {
   conjugation: "",
   etymology: "",
   wordFamily: [],
+  synonyms: [],
   correction: "",
 };
 
