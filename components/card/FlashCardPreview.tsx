@@ -3,13 +3,21 @@ import { sanitizeEmoji } from "@/lib/emoji";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { CardActionsMenu } from "./CardActionsMenu";
+import { CardSelectCheckbox } from "./CardSelectCheckbox";
 import type { CardRow } from "./cardRow";
 
-export function FlashCardPreview({ card }: { card: CardRow }) {
+export function FlashCardPreview({ card, selectionKey }: { card: CardRow; selectionKey?: string }) {
   // legacy rows may hold non-emoji values; never render tofu
   const emoji = sanitizeEmoji(card.emoji);
   return (
     <div className="group relative">
+      {selectionKey && (
+        <CardSelectCheckbox
+          selectionKey={selectionKey}
+          cardId={card.id}
+          className="absolute top-2 left-2 z-10 bg-bg"
+        />
+      )}
       <Link
         href={`/decks/${card.deckId}/cards/${card.id}`}
         className="flex min-h-36 flex-col border-[1.5px] border-line bg-bg transition-colors hover:bg-soft/30"

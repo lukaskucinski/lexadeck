@@ -19,6 +19,7 @@ import { setCardWordType } from "@/lib/actions/cards";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { CardActionsMenu } from "@/components/card/CardActionsMenu";
+import { CardSelectCheckbox } from "@/components/card/CardSelectCheckbox";
 import type { CardRow } from "@/components/card/cardRow";
 
 const COLUMN_ORDER: WordType[] = [
@@ -41,10 +42,12 @@ function KanbanCard({
   card,
   overlay = false,
   onOpen,
+  selectionKey,
 }: {
   card: CardRow;
   overlay?: boolean;
   onOpen?: (card: CardRow) => void;
+  selectionKey?: string;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.id,
@@ -60,6 +63,9 @@ function KanbanCard({
         isDragging && !overlay ? "opacity-30" : ""
       } ${overlay ? "border-[1.5px] border-line shadow-[4px_4px_0_0_var(--c-soft)]" : "cursor-pointer hover:bg-soft/40"}`}
     >
+      {!overlay && selectionKey && (
+        <CardSelectCheckbox selectionKey={selectionKey} cardId={card.id} className="shrink-0" />
+      )}
       <div className="min-w-0">
         <Link
           href={`/decks/${card.deckId}/cards/${card.id}`}
@@ -131,7 +137,7 @@ function KanbanColumn({
         }`}
       >
         {cards.slice(0, visible).map((card) => (
-          <KanbanCard key={card.id} card={card} onOpen={onOpen} />
+          <KanbanCard key={card.id} card={card} onOpen={onOpen} selectionKey={deckId} />
         ))}
         {cards.length === 0 && (
           <div className="px-3.5 py-6 text-center text-[0.74rem] font-semibold text-muted">

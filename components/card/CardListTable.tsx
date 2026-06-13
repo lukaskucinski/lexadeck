@@ -8,6 +8,7 @@ import { CardActionsMenu } from "./CardActionsMenu";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { Button } from "@/components/ui/Button";
+import { useDeckSelection } from "@/components/deck/useDeckSelection";
 import type { CardRow } from "./cardRow";
 import { useViewParams } from "./useViewParams";
 
@@ -110,16 +111,24 @@ export function CardListTable({
   sort,
   dir,
   showDeck = false,
+  selectionKey,
 }: {
   cards: CardRow[];
   sort: string;
   dir: "asc" | "desc";
   showDeck?: boolean;
+  /** when set (deck page), selection uses the shared per-deck store and the
+   *  inline delete bar yields to the floating DeckSelectionBar */
+  selectionKey?: string;
 }) {
   const router = useRouter();
   const { setParams } = useViewParams();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const usingShared = !!selectionKey;
+  const shared = useDeckSelection(selectionKey ?? "");
+  const [localSelected, setLocalSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
+
+  const selected = usingShared ? shared.selected : localSelected;
 
   function toggleSort(key: string) {
     if (sort === key) setParams({ dir: dir === "asc" ? "desc" : "asc" }, { resetPage: false });
@@ -127,7 +136,11 @@ export function CardListTable({
   }
 
   function toggle(id: string) {
-    setSelected((prev) => {
+    if (usingShared) {
+      shared.toggle(id);
+      return;
+    }
+    setLocalSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -137,9 +150,15 @@ export function CardListTable({
 
   const allSelected = cards.length > 0 && cards.every((c) => selected.has(c.id));
 
+  function toggleAll() {
+    const ids = cards.map((c) => c.id);
+    if (usingShared) shared.setMany(ids, !allSelected);
+    else setLocalSelected(allSelected ? new Set() : new Set(ids));
+  }
+
   return (
     <div className="border-[1.5px] border-line">
-      {selected.size > 0 && (
+      {!usingShared && selected.size > 0 && (
         <div className="flex items-center justify-between border-b border-line bg-soft/40 px-4 py-2">
           <span className="label-caps text-ink">{selected.size} selected</span>
           <Button
@@ -149,7 +168,7 @@ export function CardListTable({
             onClick={() =>
               startTransition(async () => {
                 await deleteCards([...selected]);
-                setSelected(new Set());
+                setLocalSelected(new Set());
               })
             }
           >
@@ -169,9 +188,7 @@ export function CardListTable({
               <input
                 type="checkbox"
                 checked={allSelected}
-                onChange={() =>
-                  setSelected(allSelected ? new Set() : new Set(cards.map((c) => c.id)))
-                }
+                onChange={toggleAll}
                 className="accent-[var(--c-ink)]"
               />
             </th>
