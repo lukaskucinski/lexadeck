@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
+  type EnrichmentItem,
   geminiConjugate,
   geminiEnrich,
   normalizeEnrichment,
@@ -19,6 +20,8 @@ import {
 import { buildConjugationTable, type ConjTable, normalizeSimpleConjugation } from "@/lib/conjugation";
 import { prisma } from "@/lib/db";
 import { sanitizeEmoji } from "@/lib/emoji";
+import { type EnrichTargetBucket, isQuotaError } from "@/lib/enrichBatch";
+import { Prisma } from "@/lib/generated/prisma/client";
 import { emptySchedulerFields } from "@/lib/srs";
 import { CardType, Gender, WordType } from "@/lib/types";
 import type { ActionState } from "./decks";
@@ -210,8 +213,42 @@ export async function setCardWordType(
 }
 
 /**
+ * Build the `Card.update` data for an enrichment result, mirroring the safe
+ * re-enrich rules: regenerate the detail layer but preserve any on-demand
+ * conjugation table, keep existing example/emoji/conjugation when the AI returns
+ * nothing, and never touch classification (wordType/gender). Shared by the
+ * single-card and deck-batch enrich paths.
+ */
+function enrichmentUpdateData(
+  card: {
+    example: string | null;
+    exampleEn: string | null;
+    emoji: string | null;
+    conjugation: string | null;
+    details: unknown;
+  },
+  item: EnrichmentItem,
+  translation: string | null,
+) {
+  const details = detailsFromEnrichment(item);
+  const priorTable = getCardDetails(card.details).conjugationTable;
+  if (priorTable) details.conjugationTable = priorTable;
+  return {
+    translation,
+    example: item.example || card.example,
+    exampleEn: item.exampleEn || card.exampleEn,
+    // item.emoji is pre-sanitized ("" when not a real emoji) — keep existing if empty
+    emoji: item.emoji || card.emoji,
+    conjugation: item.conjugation || card.conjugation,
+    details,
+    enrichedAt: new Date(),
+  };
+}
+
+/**
  * In-app AI enrichment for a single card: fills a missing translation
- * (Azure Translator) and generates example/exampleEn/emoji (Gemini).
+ * (Azure Translator) and generates example/exampleEn/emoji + the detail layer
+ * (Gemini). Classification (wordType/gender) is left to the user.
  */
 export async function enrichCard(cardId: string): Promise<{ error?: string }> {
   const user = await requireUser();
@@ -241,27 +278,10 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
       },
     ]);
     if (!raw) return { error: "The AI returned no enrichment for this card" };
-    const item = normalizeEnrichment(raw);
-
-    // re-enriching regenerates the detail layer, but keep a previously-built
-    // full conjugation table (it's generated separately, on demand)
-    const details = detailsFromEnrichment(item);
-    const priorTable = getCardDetails(card.details).conjugationTable;
-    if (priorTable) details.conjugationTable = priorTable;
 
     await prisma.card.update({
       where: { id: cardId },
-      data: {
-        translation,
-        example: item.example || card.example,
-        exampleEn: item.exampleEn || card.exampleEn,
-        // item.emoji is pre-sanitized ("" when not a real emoji) — keep existing if empty
-        emoji: item.emoji || card.emoji,
-        conjugation: item.conjugation || card.conjugation,
-        details,
-        // classification (wordType/gender) is left to the user — never overwritten here
-        enrichedAt: new Date(),
-      },
+      data: enrichmentUpdateData(card, normalizeEnrichment(raw), translation),
     });
     revalidateCardPaths(card.deckId);
     revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
@@ -324,9 +344,30 @@ export async function previewEnrichment(
 }
 
 /**
+ * Generate + cache the full conjugation table for one verb card record. Gemini
+ * returns only the SIMPLE forms; lib/conjugation.ts derives every compound tense
+ * from the participle + the fixed `haber` paradigm. A cached table is returned
+ * untouched. The caller owns auth + the VERB/es gate.
+ */
+async function buildAndCacheConjugation(card: {
+  id: string;
+  term: string;
+  details: unknown;
+}): Promise<ConjTable> {
+  const existing = getCardDetails(card.details);
+  if (existing.conjugationTable) return existing.conjugationTable;
+  const raw = await geminiConjugate(card.term);
+  const table = buildConjugationTable(card.term, normalizeSimpleConjugation(raw));
+  await prisma.card.update({
+    where: { id: card.id },
+    data: { details: { ...existing, conjugationTable: table } },
+  });
+  return table;
+}
+
+/**
  * Generate (and cache) the full conjugation table for a verb card, on demand.
- * Gemini returns only the simple forms; lib/conjugation.ts derives every
- * compound tense from the participle + the fixed `haber` paradigm. Spanish only.
+ * Spanish verbs only.
  */
 export async function conjugateVerb(
   cardId: string,
@@ -342,21 +383,230 @@ export async function conjugateVerb(
     return { error: "Conjugation currently supports Spanish verbs only" };
   }
 
-  const existing = getCardDetails(card.details);
-  if (existing.conjugationTable) return { table: existing.conjugationTable };
-
   try {
-    const raw = await geminiConjugate(card.term);
-    const table = buildConjugationTable(card.term, normalizeSimpleConjugation(raw));
-    await prisma.card.update({
-      where: { id: cardId },
-      data: { details: { ...existing, conjugationTable: table } },
-    });
+    const table = await buildAndCacheConjugation(card);
     revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
     return { table };
   } catch (err) {
     return { error: (err as Error).message.slice(0, 200) };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Deck-level batch enrichment ("Enrich all")                          */
+/* ------------------------------------------------------------------ */
+
+const NON_GRAMMAR = { not: "GRAMMAR" } as const;
+
+/** Resolve a user-owned deck and enforce the Spanish-only AI gate. */
+async function requireEsDeck(
+  deckId: string,
+): Promise<{ userId: string } | { error: string }> {
+  const user = await requireUser();
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, userId: user.id },
+    select: { language: true },
+  });
+  if (!deck) return { error: "Deck not found" };
+  if (deck.language !== "es") {
+    return { error: "Batch enrichment currently supports Spanish decks only" };
+  }
+  return { userId: user.id };
+}
+
+/** Prisma where-fragment for a deck's non-grammar cards in one enrich bucket. */
+function bucketWhere(deckId: string, bucket: EnrichTargetBucket): Prisma.CardWhereInput {
+  const base: Prisma.CardWhereInput = { deckId, wordType: NON_GRAMMAR };
+  switch (bucket) {
+    case "neverEnriched":
+      return { ...base, enrichedAt: null };
+    case "stale": // enriched before the detail layer existed (details IS NULL)
+      return { ...base, enrichedAt: { not: null }, details: { equals: Prisma.DbNull } };
+    case "enriched": // fully enriched — already has a detail layer
+      return {
+        ...base,
+        enrichedAt: { not: null },
+        NOT: { details: { equals: Prisma.DbNull } },
+      };
+  }
+}
+
+export interface EnrichTargetCounts {
+  neverEnriched: number;
+  stale: number;
+  enriched: number;
+  /** verbs with no cached conjugation table — drives the optional second pass */
+  verbsWithoutTable: number;
+}
+
+/** Per-bucket counts for the deck enrich panel. Spanish decks only. */
+export async function getEnrichTargets(
+  deckId: string,
+): Promise<{ counts?: EnrichTargetCounts; error?: string }> {
+  const gate = await requireEsDeck(deckId);
+  if ("error" in gate) return { error: gate.error };
+
+  const [neverEnriched, stale, enriched, verbs] = await Promise.all([
+    prisma.card.count({ where: bucketWhere(deckId, "neverEnriched") }),
+    prisma.card.count({ where: bucketWhere(deckId, "stale") }),
+    prisma.card.count({ where: bucketWhere(deckId, "enriched") }),
+    prisma.card.findMany({ where: { deckId, wordType: "VERB" }, select: { details: true } }),
+  ]);
+  const verbsWithoutTable = verbs.filter(
+    (v) => !getCardDetails(v.details).conjugationTable,
+  ).length;
+
+  return { counts: { neverEnriched, stale, enriched, verbsWithoutTable } };
+}
+
+const ENRICH_BUCKETS: readonly EnrichTargetBucket[] = ["neverEnriched", "stale", "enriched"];
+
+/** Card ids to enrich for the selected buckets (creation order). */
+export async function getEnrichCardIds(
+  deckId: string,
+  buckets: EnrichTargetBucket[],
+): Promise<{ ids?: string[]; error?: string }> {
+  const gate = await requireEsDeck(deckId);
+  if ("error" in gate) return { error: gate.error };
+
+  const valid = buckets.filter((b) => ENRICH_BUCKETS.includes(b));
+  if (valid.length === 0) return { ids: [] };
+
+  const cards = await prisma.card.findMany({
+    where: { OR: valid.map((b) => bucketWhere(deckId, b)) },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return { ids: cards.map((c) => c.id) };
+}
+
+export interface CardEnrichResult {
+  id: string;
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Enrich one slice of cards in a single Gemini request (+ one Azure batch for
+ * any missing translations). The client orchestrates the slices so each call
+ * stays short. Returns a per-card outcome and a `quotaExhausted` flag so the run
+ * can stop gracefully when the daily AI limit is hit — it resumes on a later
+ * click because finished cards drop out of the target buckets.
+ */
+export async function enrichCards(
+  deckId: string,
+  cardIds: string[],
+): Promise<{ results: CardEnrichResult[]; quotaExhausted: boolean; error?: string }> {
+  const gate = await requireEsDeck(deckId);
+  if ("error" in gate) return { results: [], quotaExhausted: false, error: gate.error };
+  if (cardIds.length === 0) return { results: [], quotaExhausted: false };
+
+  const cards = await prisma.card.findMany({
+    where: { id: { in: cardIds }, deckId, deck: { userId: gate.userId }, wordType: NON_GRAMMAR },
+  });
+  if (cards.length === 0) return { results: [], quotaExhausted: false };
+
+  try {
+    // fill missing translations in one Azure batch; keep the rest as-is
+    const needTranslation = cards.filter((c) => !c.translation);
+    const translated = new Map<string, string | null>();
+    if (needTranslation.length) {
+      const { out } = await translateBatch(needTranslation.map((c) => c.term));
+      needTranslation.forEach((c, i) => translated.set(c.id, out[i]?.trim() || null));
+    }
+    const translationFor = (c: (typeof cards)[number]) =>
+      translated.has(c.id) ? (translated.get(c.id) ?? null) : c.translation;
+
+    // one enrichment request for the whole slice (the quota-efficient part)
+    const raws = await geminiEnrich(
+      cards.map((c) => ({
+        id: c.id,
+        term: c.term,
+        translation: translationFor(c),
+        wordType: c.wordType,
+        gender: c.gender,
+        notes: c.notes,
+      })),
+    );
+    const byId = new Map(raws.map((r) => [String(r.id), r]));
+
+    const results: CardEnrichResult[] = [];
+    for (const card of cards) {
+      const raw = byId.get(card.id);
+      if (!raw) {
+        results.push({ id: card.id, ok: false, error: "no enrichment returned" });
+        continue;
+      }
+      await prisma.card.update({
+        where: { id: card.id },
+        data: enrichmentUpdateData(card, normalizeEnrichment(raw), translationFor(card)),
+      });
+      results.push({ id: card.id, ok: true });
+    }
+    revalidateCardPaths(deckId);
+    return { results, quotaExhausted: false };
+  } catch (err) {
+    const message = (err as Error).message ?? "enrichment failed";
+    return {
+      results: cards.map((c) => ({ id: c.id, ok: false, error: message.slice(0, 160) })),
+      quotaExhausted: isQuotaError(message),
+      error: message.slice(0, 200),
+    };
+  }
+}
+
+/** Verb card ids in the deck with no cached conjugation table yet. */
+export async function getConjugationTargetIds(
+  deckId: string,
+): Promise<{ ids?: string[]; error?: string }> {
+  const gate = await requireEsDeck(deckId);
+  if ("error" in gate) return { error: gate.error };
+
+  const verbs = await prisma.card.findMany({
+    where: { deckId, wordType: "VERB" },
+    select: { id: true, details: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return {
+    ids: verbs.filter((v) => !getCardDetails(v.details).conjugationTable).map((v) => v.id),
+  };
+}
+
+/**
+ * Optional second pass: build + cache the full conjugation table for a slice of
+ * verb cards (one Gemini request EACH — quota-heavy, hence opt-in). Stops the
+ * slice on a quota error so the client can halt the whole run.
+ */
+export async function conjugateVerbs(
+  deckId: string,
+  cardIds: string[],
+): Promise<{ results: CardEnrichResult[]; quotaExhausted: boolean; error?: string }> {
+  const gate = await requireEsDeck(deckId);
+  if ("error" in gate) return { results: [], quotaExhausted: false, error: gate.error };
+  if (cardIds.length === 0) return { results: [], quotaExhausted: false };
+
+  const verbs = await prisma.card.findMany({
+    where: { id: { in: cardIds }, deckId, deck: { userId: gate.userId }, wordType: "VERB" },
+    select: { id: true, term: true, details: true },
+  });
+
+  const results: CardEnrichResult[] = [];
+  let quotaExhausted = false;
+  for (const verb of verbs) {
+    try {
+      await buildAndCacheConjugation(verb);
+      results.push({ id: verb.id, ok: true });
+    } catch (err) {
+      const message = (err as Error).message ?? "conjugation failed";
+      results.push({ id: verb.id, ok: false, error: message.slice(0, 160) });
+      if (isQuotaError(message)) {
+        quotaExhausted = true;
+        break; // don't keep hammering an exhausted quota
+      }
+    }
+  }
+  if (results.some((r) => r.ok)) revalidateCardPaths(deckId);
+  return { results, quotaExhausted };
 }
 
 /** Manual mastery: a mastered card never enters study sessions. */

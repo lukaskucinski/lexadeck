@@ -8,6 +8,7 @@ import { FilterPanel } from "@/components/card/FilterPanel";
 import { FlashCardPreview } from "@/components/card/FlashCardPreview";
 import { Pagination } from "@/components/card/Pagination";
 import { SearchBar } from "@/components/card/SearchBar";
+import { EnrichPanel } from "@/components/deck/EnrichPanel";
 import { KanbanBoard } from "@/components/deck/KanbanBoard";
 import { LastDeckCookie } from "@/components/deck/LastDeckCookie";
 import { ViewToggle } from "@/components/deck/ViewToggle";
@@ -148,6 +149,7 @@ export default async function DeckDetailPage({
             <h1 className="type-display text-4xl md:text-5xl">{deck.name}</h1>
           </div>
           <div className="flex items-center gap-3">
+            {deck.language === "es" && <EnrichPanel deckId={id} />}
             <ButtonLink href={`/decks/${id}/cards/new`} variant="outline">
               + Card
             </ButtonLink>
