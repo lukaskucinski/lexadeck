@@ -3,8 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { geminiEnrich, translateBatch } from "@/lib/ai/enrichment";
+import {
+  geminiConjugate,
+  geminiEnrich,
+  normalizeEnrichment,
+  translateBatch,
+} from "@/lib/ai/enrichment";
 import { requireUser } from "@/lib/auth";
+import {
+  detailsFromEnrichment,
+  type EnrichmentPreview,
+  getCardDetails,
+  withoutCorrection,
+} from "@/lib/cardDetails";
+import { buildConjugationTable, type ConjTable, normalizeSimpleConjugation } from "@/lib/conjugation";
 import { prisma } from "@/lib/db";
 import { sanitizeEmoji } from "@/lib/emoji";
 import { emptySchedulerFields } from "@/lib/srs";
@@ -60,6 +72,20 @@ function cardDataFromForm(formData: FormData) {
   return parsed;
 }
 
+/**
+ * The new-card form's "Auto-fill" carries the AI detail layer in a hidden
+ * `details` field (the scalar fields prefill visible inputs). Parse it back
+ * defensively — a present, valid value means the card was AI-enriched at birth.
+ */
+function parseEnrichmentField(raw: FormDataEntryValue | null) {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    return getCardDetails(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
 function revalidateCardPaths(deckId: string) {
   revalidatePath(`/decks/${deckId}`);
   revalidatePath("/library");
@@ -94,12 +120,15 @@ export async function createCard(
   });
   if (dupe) return { error: `“${dupe.term}” is already in this deck` };
 
+  const enrichment = parseEnrichmentField(formData.get("details"));
+
   await prisma.card.create({
     data: {
       deckId,
       language: deck.language,
       ...parsed.data,
       ...emptySchedulerFields(),
+      ...(enrichment ? { details: enrichment, enrichedAt: new Date() } : {}),
     },
   });
   revalidateCardPaths(deckId);
@@ -115,14 +144,26 @@ export async function updateCard(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireOwnedCard(cardId);
+  const user = await requireUser();
+  const existing = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+    select: { term: true, translation: true, details: true },
+  });
+  if (!existing) throw new Error("Card not found");
+
   const parsed = cardDataFromForm(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const card = await prisma.card.update({
-    where: { id: cardId },
-    data: parsed.data,
-  });
+  // a stale "did you mean…?" no longer applies once term/translation changes
+  const edited =
+    parsed.data.term !== existing.term ||
+    (parsed.data.translation ?? null) !== (existing.translation ?? null);
+  const data =
+    edited && getCardDetails(existing.details).correction
+      ? { ...parsed.data, details: withoutCorrection(existing.details) }
+      : parsed.data;
+
+  const card = await prisma.card.update({ where: { id: cardId }, data });
   revalidateCardPaths(card.deckId);
   redirect(`/decks/${card.deckId}/cards/${cardId}`);
 }
@@ -136,11 +177,22 @@ export async function updateCardInline(
   const trimmed = value.trim();
   if (field === "term" && !trimmed) return { error: "Term cannot be empty" };
 
-  await requireOwnedCard(cardId);
-  const card = await prisma.card.update({
-    where: { id: cardId },
-    data: { [field]: field === "translation" && !trimmed ? null : trimmed },
+  const user = await requireUser();
+  const existing = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+    select: { details: true },
   });
+  if (!existing) return { error: "Card not found" };
+
+  const data: Record<string, unknown> = {
+    [field]: field === "translation" && !trimmed ? null : trimmed,
+  };
+  // editing term/translation invalidates a spelling flag
+  if (getCardDetails(existing.details).correction) {
+    data.details = withoutCorrection(existing.details);
+  }
+
+  const card = await prisma.card.update({ where: { id: cardId }, data });
   revalidateCardPaths(card.deckId);
   return {};
 }
@@ -178,7 +230,7 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
       translation = out[0]?.trim() || null;
     }
 
-    const [item] = await geminiEnrich([
+    const [raw] = await geminiEnrich([
       {
         id: card.id,
         term: card.term,
@@ -188,22 +240,120 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
         notes: card.notes,
       },
     ]);
-    if (!item) return { error: "The AI returned no enrichment for this card" };
+    if (!raw) return { error: "The AI returned no enrichment for this card" };
+    const item = normalizeEnrichment(raw);
+
+    // re-enriching regenerates the detail layer, but keep a previously-built
+    // full conjugation table (it's generated separately, on demand)
+    const details = detailsFromEnrichment(item);
+    const priorTable = getCardDetails(card.details).conjugationTable;
+    if (priorTable) details.conjugationTable = priorTable;
 
     await prisma.card.update({
       where: { id: cardId },
       data: {
         translation,
-        example: item.example.trim() || card.example,
-        exampleEn: item.exampleEn.trim() || card.exampleEn,
-        // Gemini sometimes returns non-emoji symbols that render as tofu
-        emoji: sanitizeEmoji(item.emoji) ?? card.emoji,
+        example: item.example || card.example,
+        exampleEn: item.exampleEn || card.exampleEn,
+        // item.emoji is pre-sanitized ("" when not a real emoji) — keep existing if empty
+        emoji: item.emoji || card.emoji,
+        conjugation: item.conjugation || card.conjugation,
+        details,
+        // classification (wordType/gender) is left to the user — never overwritten here
         enrichedAt: new Date(),
       },
     });
     revalidateCardPaths(card.deckId);
     revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
     return {};
+  } catch (err) {
+    return { error: (err as Error).message.slice(0, 200) };
+  }
+}
+
+/**
+ * Auto-fill for the new-card form: enriches a typed term that has no card yet
+ * and returns translation + classification + the detail layer for review.
+ * Persists nothing — the form prefills and the user saves explicitly.
+ * Spanish decks only (the Gemini prompt is Spanish-tuned).
+ */
+export async function previewEnrichment(
+  deckId: string,
+  term: string,
+): Promise<{ preview?: EnrichmentPreview; error?: string }> {
+  const user = await requireUser();
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, userId: user.id },
+    select: { language: true },
+  });
+  if (!deck) return { error: "Deck not found" };
+  if (deck.language !== "es") {
+    return { error: "Auto-fill currently supports Spanish decks only" };
+  }
+
+  const cleaned = term.trim();
+  if (!cleaned) return { error: "Enter a term first" };
+  if (cleaned.length > 200) return { error: "Term is too long" };
+
+  try {
+    const { out } = await translateBatch([cleaned]);
+    const translation = out[0]?.trim() || null;
+
+    const [raw] = await geminiEnrich([
+      { id: "preview", term: cleaned, translation, wordType: null, gender: null, notes: null },
+    ]);
+    if (!raw) return { error: "The AI returned no suggestion" };
+    const item = normalizeEnrichment(raw);
+
+    return {
+      preview: {
+        translation,
+        wordType: item.wordType,
+        gender: item.gender,
+        example: item.example,
+        exampleEn: item.exampleEn,
+        emoji: item.emoji,
+        conjugation: item.conjugation,
+        details: detailsFromEnrichment(item),
+        correction: item.correction,
+      },
+    };
+  } catch (err) {
+    return { error: (err as Error).message.slice(0, 200) };
+  }
+}
+
+/**
+ * Generate (and cache) the full conjugation table for a verb card, on demand.
+ * Gemini returns only the simple forms; lib/conjugation.ts derives every
+ * compound tense from the participle + the fixed `haber` paradigm. Spanish only.
+ */
+export async function conjugateVerb(
+  cardId: string,
+): Promise<{ table?: ConjTable; error?: string }> {
+  const user = await requireUser();
+  const card = await prisma.card.findFirst({
+    where: { id: cardId, deck: { userId: user.id } },
+    include: { deck: { select: { language: true } } },
+  });
+  if (!card) return { error: "Card not found" };
+  if (card.wordType !== "VERB") return { error: "Only verbs can be conjugated" };
+  if (card.deck.language !== "es") {
+    return { error: "Conjugation currently supports Spanish verbs only" };
+  }
+
+  const existing = getCardDetails(card.details);
+  if (existing.conjugationTable) return { table: existing.conjugationTable };
+
+  try {
+    const raw = await geminiConjugate(card.term);
+    const table = buildConjugationTable(card.term, normalizeSimpleConjugation(raw));
+    await prisma.card.update({
+      where: { id: cardId },
+      data: { details: { ...existing, conjugationTable: table } },
+    });
+    revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
+    return { table };
   } catch (err) {
     return { error: (err as Error).message.slice(0, 200) };
   }

@@ -3,6 +3,8 @@
  *   npx tsx scripts/ai-smoke.ts
  */
 import "dotenv/config";
+import { geminiConjugate, geminiEnrich, normalizeEnrichment } from "../lib/ai/enrichment";
+import { buildConjugationTable, normalizeSimpleConjugation } from "../lib/conjugation";
 
 async function testAzure(): Promise<void> {
   const key = process.env.AZURE_TRANSLATOR_KEY;
@@ -28,37 +30,34 @@ async function testAzure(): Promise<void> {
 }
 
 async function testGemini(): Promise<void> {
-  const key = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
-  if (!key) throw new Error("GEMINI_API_KEY missing");
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: 'Return JSON only: {"example": "<one short Spanish sentence using the verb fallecer>", "emoji": "<one emoji>"}',
-              },
-            ],
-          },
-        ],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
-      }),
-    },
-  );
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("Gemini returned no content");
+  // exercise the real enrichment path, including the expanded detail layer
+  const [raw] = await geminiEnrich([
+    { id: "smoke", term: "gozar", translation: "to enjoy", wordType: null, gender: null, notes: null },
+  ]);
+  if (!raw) throw new Error("Gemini returned no item");
+  const item = normalizeEnrichment(raw);
+  const dash = (s: string) => s || "—";
   console.log(`GEMINI OK (${model}):`);
-  console.log(`  ${text.replaceAll("\n", " ").slice(0, 200)}`);
+  console.log(`  wordType=${item.wordType} gender=${item.gender ?? "—"} emoji=${dash(item.emoji)}`);
+  console.log(`  example:      ${dash(item.example)}`);
+  console.log(`  usagePattern: ${dash(item.usagePattern)}`);
+  console.log(`  collocations: ${dash(item.collocations.join(" · "))}`);
+  console.log(`  conjugation:  ${dash(item.conjugation.replace(/\n/g, " / "))}`);
+  console.log(`  etymology:    ${dash(item.etymology)}`);
+  console.log(`  wordFamily:   ${dash(item.wordFamily.join(" · "))}`);
+  console.log(`  synonyms:     ${dash(item.synonyms.map((s) => `${s.es} (${s.en})`).join(", "))}`);
+  console.log(`  correction:   ${dash(item.correction)}`);
+}
+
+async function testConjugation(): Promise<void> {
+  // pedir is the e→i stem-changer the deterministic JS libs got wrong
+  const raw = await geminiConjugate("pedir");
+  const t = buildConjugationTable("pedir", normalizeSimpleConjugation(raw));
+  console.log("GEMINI CONJUGATION OK (pedir):");
+  console.log(`  present:    ${t.indicativePresent.join(", ")}`);
+  console.log(`  participle: ${t.participle}`);
+  console.log(`  pres.perfect (derived): ${t.presentPerfect.join(", ")}`);
 }
 
 async function main() {
@@ -74,6 +73,12 @@ async function main() {
   } catch (err) {
     failed = true;
     console.error("GEMINI FAILED:", (err as Error).message);
+  }
+  try {
+    await testConjugation();
+  } catch (err) {
+    failed = true;
+    console.error("GEMINI CONJUGATION FAILED:", (err as Error).message);
   }
   if (failed) process.exit(1);
   console.log("\nAI SMOKE: PASS");

@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { CardStatusActions } from "@/components/card/CardStatusActions";
+import { ConjugationPanel } from "@/components/card/ConjugationPanel";
 import { EnrichButton } from "@/components/card/EnrichButton";
+import { SynonymList } from "@/components/card/SynonymList";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { SpeakButton } from "@/components/ui/SpeakButton";
 import { requireUser } from "@/lib/auth";
+import { getCardDetails } from "@/lib/cardDetails";
 import { prisma } from "@/lib/db";
 import { sanitizeEmoji } from "@/lib/emoji";
 import { getSRSState, STABILITY_HINT } from "@/lib/srs";
@@ -16,6 +20,16 @@ export const dynamic = "force-dynamic";
 function fmtDate(date: Date | null): string {
   if (!date) return "—";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** A labeled "specimen" block, matching the existing Conjugation/Notes sections. */
+function Specimen({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="border-t border-soft px-6 py-5">
+      <p className="label-caps mb-2 text-muted">{label}</p>
+      {children}
+    </div>
+  );
 }
 
 export default async function CardDetailPage({
@@ -34,6 +48,7 @@ export default async function CardDetailPage({
   const srs = getSRSState(card);
   // legacy rows may hold non-emoji values; never render tofu
   const emoji = sanitizeEmoji(card.emoji);
+  const details = getCardDetails(card.details);
 
   return (
     <div className="max-w-3xl">
@@ -64,6 +79,12 @@ export default async function CardDetailPage({
           <p className="mt-4 text-2xl font-medium tracking-tight">
             {card.translation ?? <span className="text-muted/60">no translation yet</span>}
           </p>
+          {details.correction && (
+            <p className="mt-4 text-sm font-medium text-coral">
+              <span className="label-caps mr-2">Check</span>
+              {details.correction}
+            </p>
+          )}
         </div>
 
         {(card.example || card.exampleEn) && (
@@ -78,6 +99,18 @@ export default async function CardDetailPage({
           </div>
         )}
 
+        {details.usagePattern && (
+          <Specimen label="Usage pattern">
+            <p className="text-sm font-semibold leading-relaxed">{details.usagePattern}</p>
+          </Specimen>
+        )}
+
+        {details.collocations && (
+          <Specimen label="Collocations">
+            <p className="text-sm leading-relaxed">{details.collocations.join(" · ")}</p>
+          </Specimen>
+        )}
+
         {card.conjugation && (
           <div className="border-t border-soft px-6 py-5">
             <p className="label-caps mb-2 text-muted">Conjugation</p>
@@ -85,6 +118,28 @@ export default async function CardDetailPage({
               {card.conjugation}
             </pre>
           </div>
+        )}
+
+        {card.wordType === "VERB" && card.deck.language === "es" && (
+          <ConjugationPanel cardId={cardId} initialTable={details.conjugationTable} />
+        )}
+
+        {details.wordFamily && (
+          <Specimen label="Word family">
+            <p className="text-sm leading-relaxed">{details.wordFamily.join(" · ")}</p>
+          </Specimen>
+        )}
+
+        {details.synonyms && (
+          <Specimen label="Synonyms">
+            <SynonymList items={details.synonyms} />
+          </Specimen>
+        )}
+
+        {details.etymology && (
+          <Specimen label="Etymology">
+            <p className="text-sm leading-relaxed text-muted">{details.etymology}</p>
+          </Specimen>
         )}
 
         {card.notes && (

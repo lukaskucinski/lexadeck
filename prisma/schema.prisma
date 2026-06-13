@@ -46,6 +46,7 @@ model Card {
   emoji       String?
   imageUrl    String?
   audioUrl    String?
+  details     Json? // AI detail layer: usagePattern, collocations[], etymology, wordFamily[], correction (see lib/cardDetails.ts)
   enrichedAt  DateTime?
 
   // FSRS scheduling state (mirrors ts-fsrs Card)
