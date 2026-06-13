@@ -18,6 +18,10 @@ export function FlashCardPreview({ card, selectionKey }: { card: CardRow; select
     <div className="group relative">
       <Link
         href={`/decks/${card.deckId}/cards/${card.id}`}
+        // shift+mousedown would extend the page's text selection — suppress it
+        onMouseDown={(e) => {
+          if (selectionKey && e.shiftKey) e.preventDefault();
+        }}
         onClick={(e) => {
           // shift-click selects instead of opening
           if (selectionKey && e.shiftKey) {

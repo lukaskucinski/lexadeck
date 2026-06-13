@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useTransition } from "react";
-import { deleteCards, updateCardInline } from "@/lib/actions/cards";
+import { deleteCards } from "@/lib/actions/cards";
 import { CardActionsMenu } from "./CardActionsMenu";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
@@ -17,68 +17,6 @@ function dueLabel(due: Date): string {
   if (days <= 0) return "now";
   if (days === 1) return "tomorrow";
   return `${days}d`;
-}
-
-/* Editable cell: double-click to edit, Enter/blur saves, Esc cancels. */
-function EditableCell({
-  cardId,
-  field,
-  value,
-  className = "",
-}: {
-  cardId: string;
-  field: "term" | "translation";
-  value: string | null;
-  className?: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? "");
-  const [current, setCurrent] = useState(value ?? "");
-  const [prevValue, setPrevValue] = useState(value);
-
-  // derived-state sync when the server re-renders with fresh data
-  if (prevValue !== value) {
-    setPrevValue(value);
-    setCurrent(value ?? "");
-    setDraft(value ?? "");
-  }
-
-  async function save() {
-    setEditing(false);
-    if (draft.trim() === current.trim()) return;
-    const res = await updateCardInline(cardId, field, draft);
-    if (!res.error) setCurrent(draft.trim());
-    else setDraft(current);
-  }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") save();
-          if (e.key === "Escape") {
-            setDraft(current);
-            setEditing(false);
-          }
-        }}
-        className="w-full border-b-2 border-coral bg-transparent outline-none"
-      />
-    );
-  }
-
-  return (
-    <span
-      onDoubleClick={() => setEditing(true)}
-      title="Double-click to edit"
-      className={`block cursor-text ${className} ${current ? "" : "text-muted/60"}`}
-    >
-      {current || "—"}
-    </span>
-  );
 }
 
 function SortHeader({
@@ -204,6 +142,10 @@ export function CardListTable({
           {cards.map((card) => (
             <tr
               key={card.id}
+              // shift+mousedown would extend the page's text selection — suppress it
+              onMouseDown={(e) => {
+                if (e.shiftKey) e.preventDefault();
+              }}
               onClick={(e) => {
                 // deck view: shift-click selects; otherwise open the card
                 if (usingShared && e.shiftKey) {
@@ -216,7 +158,7 @@ export function CardListTable({
                 usingShared && selected.has(card.id) ? "bg-soft" : "hover:bg-soft/25"
               }`}
             >
-              {/* interactive cells swallow the row click */}
+              {/* checkbox cell swallows the row click (library only) */}
               {!usingShared && (
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
@@ -227,12 +169,8 @@ export function CardListTable({
                   />
                 </td>
               )}
-              <td className="px-3 py-2 font-bold" onClick={(e) => e.stopPropagation()}>
-                <EditableCell cardId={card.id} field="term" value={card.term} />
-              </td>
-              <td className="px-3 py-2 text-muted" onClick={(e) => e.stopPropagation()}>
-                <EditableCell cardId={card.id} field="translation" value={card.translation} />
-              </td>
+              <td className="px-3 py-2 font-bold">{card.term}</td>
+              <td className="px-3 py-2 text-muted">{card.translation || "—"}</td>
               {showDeck && (
                 <td className="hidden px-3 py-2 text-[0.72rem] font-semibold text-muted md:table-cell">{card.deckName}</td>
               )}

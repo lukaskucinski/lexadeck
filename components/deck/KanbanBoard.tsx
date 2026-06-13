@@ -64,6 +64,11 @@ function KanbanCard({
     <div
       ref={overlay ? undefined : setNodeRef}
       {...(overlay ? {} : { ...attributes, ...listeners })}
+      // shift+mousedown would extend the page's text selection — suppress it
+      // (dnd uses pointer events, so this doesn't affect dragging)
+      onMouseDown={(e) => {
+        if (!overlay && selectionKey && e.shiftKey) e.preventDefault();
+      }}
       onClick={(e) => {
         // shift-click selects instead of opening
         if (!overlay && selectionKey && e.shiftKey) {

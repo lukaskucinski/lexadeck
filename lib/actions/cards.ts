@@ -171,35 +171,6 @@ export async function updateCard(
   redirect(`/decks/${card.deckId}/cards/${cardId}`);
 }
 
-/** Inline edit from the list view — term/translation only. */
-export async function updateCardInline(
-  cardId: string,
-  field: "term" | "translation",
-  value: string,
-): Promise<{ error?: string }> {
-  const trimmed = value.trim();
-  if (field === "term" && !trimmed) return { error: "Term cannot be empty" };
-
-  const user = await requireUser();
-  const existing = await prisma.card.findFirst({
-    where: { id: cardId, deck: { userId: user.id } },
-    select: { details: true },
-  });
-  if (!existing) return { error: "Card not found" };
-
-  const data: Record<string, unknown> = {
-    [field]: field === "translation" && !trimmed ? null : trimmed,
-  };
-  // editing term/translation invalidates a spelling flag
-  if (getCardDetails(existing.details).correction) {
-    data.details = withoutCorrection(existing.details);
-  }
-
-  const card = await prisma.card.update({ where: { id: cardId }, data });
-  revalidateCardPaths(card.deckId);
-  return {};
-}
-
 /** Kanban drag-and-drop reclassification. */
 export async function setCardWordType(
   cardId: string,
