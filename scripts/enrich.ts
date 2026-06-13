@@ -17,11 +17,12 @@ import "dotenv/config";
 import { parseArgs } from "node:util";
 import {
   geminiEnrich,
+  normalizeEnrichment,
+  type RawEnrichment,
   translateBatch,
-  type EnrichmentItem,
 } from "../lib/ai/enrichment";
+import { detailsFromEnrichment } from "../lib/cardDetails";
 import { prisma } from "../lib/db";
-import { sanitizeEmoji } from "../lib/emoji";
 
 const { values: args } = parseArgs({
   options: {
@@ -98,7 +99,7 @@ async function passGemini(): Promise<void> {
     return;
   }
 
-  async function enrichWithRetry(batch: typeof cards): Promise<EnrichmentItem[]> {
+  async function enrichWithRetry(batch: typeof cards): Promise<RawEnrichment[]> {
     try {
       return await geminiEnrich(batch);
     } catch (err) {
@@ -111,8 +112,8 @@ async function passGemini(): Promise<void> {
   for (let i = 0; i < cards.length; i += GEMINI_BATCH) {
     const batch = cards.slice(i, i + GEMINI_BATCH);
     try {
-      const items = await enrichWithRetry(batch);
-      const byId = new Map(items.map((item) => [item.id, item]));
+      const raws = await enrichWithRetry(batch);
+      const byId = new Map(raws.map((r) => [String(r.id), normalizeEnrichment(r)]));
       for (const card of batch) {
         const item = byId.get(card.id);
         if (!item) {
@@ -122,9 +123,11 @@ async function passGemini(): Promise<void> {
         await prisma.card.update({
           where: { id: card.id },
           data: {
-            example: item.example.trim() || null,
-            exampleEn: item.exampleEn.trim() || null,
-            emoji: sanitizeEmoji(item.emoji),
+            example: item.example || null,
+            exampleEn: item.exampleEn || null,
+            emoji: item.emoji || null, // already sanitized by normalizeEnrichment
+            conjugation: item.conjugation || undefined, // keep any existing if AI gave none
+            details: detailsFromEnrichment(item),
             enrichedAt: new Date(),
           },
         });

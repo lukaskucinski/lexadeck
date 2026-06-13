@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Sparkles } from "lucide-react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import type { ActionState } from "@/lib/actions/decks";
+import type { EnrichmentPreview } from "@/lib/cardDetails";
 import {
   CardType,
   Gender,
@@ -51,30 +53,98 @@ export function CardForm({
   submitLabel,
   allowAddAnother = false,
   cancelHref,
+  enrich,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   initial?: CardFormValues;
   submitLabel: string;
   allowAddAnother?: boolean;
   cancelHref?: string;
+  /** when set, shows an AI "Auto-fill from term" control (create flow, es decks) */
+  enrich?: (term: string) => Promise<{ preview?: EnrichmentPreview; error?: string }>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const [wordType, setWordType] = useState(initial.wordType ?? "NOUN");
   const [formKey, setFormKey] = useState(0);
+  const [detailsJson, setDetailsJson] = useState("");
+  const [correction, setCorrection] = useState<string | null>(null);
+  const [autofillError, setAutofillError] = useState<string | null>(null);
+  const [autofilling, startAutofill] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function handleAutofill() {
+    if (!enrich || !formRef.current) return;
+    const term = String(new FormData(formRef.current).get("term") ?? "").trim();
+    setAutofillError(null);
+    startAutofill(async () => {
+      const res = await enrich(term);
+      const form = formRef.current;
+      if (!form) return;
+      if (res.error || !res.preview) {
+        setAutofillError(res.error ?? "No suggestion returned");
+        return;
+      }
+      const p = res.preview;
+      const set = (name: string, value: string) => {
+        const el = form.elements.namedItem(name) as
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | HTMLSelectElement
+          | null;
+        if (el) el.value = value;
+      };
+      setWordType(p.wordType); // controlled Select — re-renders + toggles gender
+      set("translation", p.translation ?? "");
+      set("gender", p.gender ?? "");
+      set("example", p.example);
+      set("exampleEn", p.exampleEn);
+      set("emoji", p.emoji);
+      set("conjugation", p.conjugation);
+      setDetailsJson(JSON.stringify(p.details));
+      setCorrection(p.correction || null);
+    });
+  }
 
   return (
     <form
       key={formKey}
+      ref={formRef}
       action={formAction}
       className="max-w-2xl"
       onSubmit={(e) => {
         const submitter = (e.nativeEvent as SubmitEvent).submitter;
         if (submitter?.getAttribute("value") === "true") {
           // "save + add another": remount the form after the action resolves
-          setTimeout(() => setFormKey((k) => k + 1), 50);
+          setTimeout(() => {
+            setFormKey((k) => k + 1);
+            setDetailsJson("");
+            setCorrection(null);
+            setAutofillError(null);
+          }, 50);
         }
       }}
     >
+      {enrich && (
+        <>
+          <input type="hidden" name="details" value={detailsJson} readOnly />
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={autofilling}
+              title="Use AI to fill translation, word type, example, and details from the term"
+              onClick={handleAutofill}
+            >
+              <Sparkles size={14} />
+              {autofilling ? "Auto-filling…" : "Auto-fill from term"}
+            </Button>
+            {autofillError && (
+              <span className="text-sm font-bold text-coral">{autofillError}</span>
+            )}
+            {correction && <span className="text-sm font-medium text-coral">{correction}</span>}
+          </div>
+        </>
+      )}
       <div className="border-[1.5px] border-line">
         <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr]">
           <Field label="Term" className="sm:border-r">

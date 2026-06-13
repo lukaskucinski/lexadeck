@@ -6,6 +6,8 @@
  *      GEMINI_API_KEY, GEMINI_MODEL,
  *      DEEPL_API_KEY + ENABLE_DEEPL_FALLBACK (optional)
  */
+import { sanitizeEmoji } from "../emoji";
+import { Gender, WordType } from "../types";
 
 /**
  * Values pasted into dashboards (e.g. Vercel env vars) can carry a BOM
@@ -88,21 +90,40 @@ export async function translateBatch(
 /* Gemini: example sentence + gloss + emoji                            */
 /* ------------------------------------------------------------------ */
 
+/** Normalized enrichment for one card. Detail-layer fields are "" / [] when n/a. */
 export interface EnrichmentItem {
   id: string;
+  // classification — consumed only by the create-time auto-fill path
+  wordType: string;
+  gender: string | null;
+  // core
   example: string;
   exampleEn: string;
   emoji: string;
+  // detail layer
+  usagePattern: string;
+  collocations: string[];
+  conjugation: string;
+  etymology: string;
+  wordFamily: string[];
+  correction: string;
 }
+
+/** Raw, unvalidated object as Gemini returns it — always run through normalizeEnrichment. */
+export type RawEnrichment = { id: string } & Record<string, unknown>;
 
 export interface EnrichableCard {
   id: string;
   term: string;
   translation: string | null;
-  wordType: string;
+  /** null = unknown (create-time path): the model infers it. */
+  wordType: string | null;
   gender: string | null;
   notes: string | null;
 }
+
+const STRING_FIELDS = ["id", "wordType", "gender", "example", "exampleEn", "emoji",
+  "usagePattern", "conjugation", "etymology", "correction"] as const;
 
 const RESPONSE_SCHEMA = {
   type: "ARRAY",
@@ -110,13 +131,67 @@ const RESPONSE_SCHEMA = {
     type: "OBJECT",
     properties: {
       id: { type: "STRING" },
+      wordType: { type: "STRING", enum: Object.values(WordType) },
+      gender: { type: "STRING" },
       example: { type: "STRING" },
       exampleEn: { type: "STRING" },
       emoji: { type: "STRING" },
+      usagePattern: { type: "STRING" },
+      collocations: { type: "ARRAY", items: { type: "STRING" } },
+      conjugation: { type: "STRING" },
+      etymology: { type: "STRING" },
+      wordFamily: { type: "ARRAY", items: { type: "STRING" } },
+      correction: { type: "STRING" },
     },
-    required: ["id", "example", "exampleEn", "emoji"],
+    required: [...STRING_FIELDS, "collocations", "wordFamily"],
   },
 } as const;
+
+const MAX_COLLOCATIONS = 5;
+const MAX_WORD_FAMILY = 4;
+const WORD_TYPES = new Set<string>(Object.values(WordType));
+const GENDERS = new Set<string>(Object.values(Gender));
+
+function trimStr(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function trimList(v: unknown, max: number): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((x) => (typeof x === "string" ? x.trim() : ""))
+    .filter((x) => x.length > 0)
+    .slice(0, max);
+}
+
+/**
+ * Defensively coerce a raw Gemini object into a typed EnrichmentItem: trims
+ * strings, caps + de-blanks list fields, validates the part-of-speech against
+ * WordType (fallback OTHER), keeps gender only on nouns, and drops non-emoji
+ * symbols (sanitizeEmoji). The single trusted gate for every enrichment caller.
+ */
+export function normalizeEnrichment(raw: Record<string, unknown>): EnrichmentItem {
+  const wordTypeRaw = trimStr(raw.wordType).toUpperCase();
+  const wordType = WORD_TYPES.has(wordTypeRaw) ? wordTypeRaw : "OTHER";
+
+  const genderRaw = trimStr(raw.gender).toUpperCase();
+  const gender = wordType === "NOUN" && GENDERS.has(genderRaw) ? genderRaw : null;
+
+  return {
+    id: trimStr(raw.id),
+    wordType,
+    gender,
+    example: trimStr(raw.example),
+    exampleEn: trimStr(raw.exampleEn),
+    emoji: sanitizeEmoji(trimStr(raw.emoji)) ?? "",
+    usagePattern: trimStr(raw.usagePattern),
+    collocations: trimList(raw.collocations, MAX_COLLOCATIONS),
+    conjugation: trimStr(raw.conjugation),
+    etymology: trimStr(raw.etymology),
+    wordFamily: trimList(raw.wordFamily, MAX_WORD_FAMILY),
+    correction: trimStr(raw.correction),
+  };
+}
 
 class GeminiHttpError extends Error {
   constructor(
@@ -139,7 +214,7 @@ async function geminiGenerate(
   model: string,
   key: string,
   prompt: string,
-): Promise<EnrichmentItem[]> {
+): Promise<RawEnrichment[]> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {
@@ -165,12 +240,12 @@ async function geminiGenerate(
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error("Gemini returned no content");
 
-  const parsed = JSON.parse(text) as EnrichmentItem[];
+  const parsed = JSON.parse(text) as RawEnrichment[];
   if (!Array.isArray(parsed)) throw new Error("Gemini response is not an array");
   return parsed;
 }
 
-export async function geminiEnrich(cards: EnrichableCard[]): Promise<EnrichmentItem[]> {
+export async function geminiEnrich(cards: EnrichableCard[]): Promise<RawEnrichment[]> {
   const key = env("GEMINI_API_KEY");
   const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
   // flash-lite has its own (higher) free-tier quota — used when the primary
@@ -190,14 +265,26 @@ export async function geminiEnrich(cards: EnrichableCard[]): Promise<EnrichmentI
     }),
   );
 
+  const wordTypes = Object.values(WordType)
+    .filter((w) => w !== "GRAMMAR")
+    .join(", ");
+
   const prompt = `You are helping build Spanish→English flashcards for an adult learner (A2/B1 level).
 
-For EACH card below, produce:
+For EACH card below, return one JSON object carrying the same "id", with these fields:
+- "wordType": the part of speech, one of: ${wordTypes}. If the card's wordType is non-null, keep it; if it is null, infer it from the term and translation.
+- "gender": for NOUN terms only, one of MASCULINE, FEMININE, NEUTER, EITHER; "" for any non-noun. If the card's gender is non-null, keep it.
 - "example": one natural, useful Spanish sentence (8-14 words) using the term in a common context. Match the term's register. For expressions, use the expression naturally.
 - "exampleEn": a natural English translation of that sentence.
 - "emoji": exactly one standard Unicode emoji character that best evokes the term's meaning ("" if nothing fits). Never use letters, words, or keycap combinations — a real emoji or "".
+- "usagePattern": the grammatical frame the term is typically used in, e.g. "gozar de + noun" or "soñar con algo". "" if there is no characteristic pattern.
+- "collocations": 3-5 short, natural word combinations the term commonly appears in (e.g. "gozar de buena salud"). [] if none are characteristic.
+- "conjugation": for VERBS only, a compact present-tense summary with yo/tú/él/nosotros/ellos forms on separate lines, noting any key irregular forms. "" for non-verbs.
+- "etymology": a brief one-sentence origin note. Return "" unless you are confident — never guess.
+- "wordFamily": 2-4 closely related words sharing the same root, e.g. ["gozo","gozoso"]. [] if none.
+- "correction": "" in almost all cases. ONLY if the term or its given translation is clearly MISSPELLED — not merely a regional or stylistic variant — return a short note naming the likely intended form, e.g. "'recivir' looks misspelled — did you mean 'recibir'?". Respect valid regional spellings and accents; never flag a correct word.
 
-Do not contradict the given translation. Return a JSON array with one object per card, carrying the same "id".
+Do not contradict the given translation. Keep every field concise and practical for a learner. Return a JSON array with one object per card.
 
 Cards:
 ${cardLines.join("\n")}`;

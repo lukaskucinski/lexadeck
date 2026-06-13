@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { azureTranslate, geminiEnrich } from "./enrichment";
+import { azureTranslate, geminiEnrich, normalizeEnrichment } from "./enrichment";
 
 // Values pasted into the Vercel dashboard can carry a BOM (U+FEFF) — these
 // tests pin the env-sanitizing behavior that fixed enrichment in production.
@@ -87,5 +87,115 @@ describe("geminiEnrich env hygiene + fallback", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1][0]).toContain("models/gemini-2.5-flash-lite:");
+  });
+});
+
+describe("normalizeEnrichment", () => {
+  it("passes through a well-formed item", () => {
+    const out = normalizeEnrichment({
+      id: "c1",
+      wordType: "VERB",
+      gender: null,
+      example: "Espero gozar de buena salud.",
+      exampleEn: "I hope to enjoy good health.",
+      emoji: "😀",
+      usagePattern: "gozar de + noun",
+      collocations: ["gozar de buena salud", "gozar de libertad"],
+      conjugation: "gozo, gozas, goza",
+      etymology: "From Latin gaudēre.",
+      wordFamily: ["gozo", "gozoso"],
+      correction: "",
+    });
+    expect(out).toEqual({
+      id: "c1",
+      wordType: "VERB",
+      gender: null,
+      example: "Espero gozar de buena salud.",
+      exampleEn: "I hope to enjoy good health.",
+      emoji: "😀",
+      usagePattern: "gozar de + noun",
+      collocations: ["gozar de buena salud", "gozar de libertad"],
+      conjugation: "gozo, gozas, goza",
+      etymology: "From Latin gaudēre.",
+      wordFamily: ["gozo", "gozoso"],
+      correction: "",
+    });
+  });
+
+  it("trims string fields", () => {
+    const out = normalizeEnrichment({
+      id: "c1",
+      wordType: "NOUN",
+      gender: "FEMININE",
+      usagePattern: "  la madrugada  ",
+      etymology: "\nFrom Latin maturus.\n",
+      correction: "  did you mean recibir?  ",
+    });
+    expect(out.usagePattern).toBe("la madrugada");
+    expect(out.etymology).toBe("From Latin maturus.");
+    expect(out.correction).toBe("did you mean recibir?");
+  });
+
+  it("caps collocations to 5 and wordFamily to 4, dropping blank entries", () => {
+    const out = normalizeEnrichment({
+      id: "c1",
+      collocations: ["a", "  ", "b", "c", "d", "e", "f", "g"],
+      wordFamily: ["x", "", "y", "z", "w", "v"],
+    });
+    expect(out.collocations).toEqual(["a", "b", "c", "d", "e"]);
+    expect(out.wordFamily).toEqual(["x", "y", "z", "w"]);
+  });
+
+  it("coerces non-array collocations/wordFamily to []", () => {
+    const out = normalizeEnrichment({
+      id: "c1",
+      collocations: "not an array",
+      wordFamily: null,
+    });
+    expect(out.collocations).toEqual([]);
+    expect(out.wordFamily).toEqual([]);
+  });
+
+  it("sanitizes emoji, returning '' when not a real emoji", () => {
+    expect(normalizeEnrichment({ id: "c1", emoji: "✦" }).emoji).toBe("");
+    expect(normalizeEnrichment({ id: "c1", emoji: "dog" }).emoji).toBe("");
+    expect(normalizeEnrichment({ id: "c1", emoji: " 🐶 " }).emoji).toBe("🐶");
+  });
+
+  it("uppercases and validates wordType, falling back to OTHER", () => {
+    expect(normalizeEnrichment({ id: "c1", wordType: "verb" }).wordType).toBe("VERB");
+    expect(normalizeEnrichment({ id: "c1", wordType: "noun" }).wordType).toBe("NOUN");
+    expect(normalizeEnrichment({ id: "c1", wordType: "gibberish" }).wordType).toBe("OTHER");
+    expect(normalizeEnrichment({ id: "c1" }).wordType).toBe("OTHER");
+  });
+
+  it("validates gender and nulls it for non-nouns", () => {
+    expect(
+      normalizeEnrichment({ id: "c1", wordType: "NOUN", gender: "feminine" }).gender,
+    ).toBe("FEMININE");
+    expect(
+      normalizeEnrichment({ id: "c1", wordType: "NOUN", gender: "bogus" }).gender,
+    ).toBeNull();
+    // gender is meaningless on a verb — drop it even if the model returns one
+    expect(
+      normalizeEnrichment({ id: "c1", wordType: "VERB", gender: "FEMININE" }).gender,
+    ).toBeNull();
+  });
+
+  it("fills missing fields with empty defaults", () => {
+    expect(normalizeEnrichment({ id: "c1" })).toEqual({
+      id: "c1",
+      wordType: "OTHER",
+      gender: null,
+      example: "",
+      exampleEn: "",
+      emoji: "",
+      usagePattern: "",
+      collocations: [],
+      conjugation: "",
+      etymology: "",
+      wordFamily: [],
+      correction: "",
+    });
   });
 });
