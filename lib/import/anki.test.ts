@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import { parseDeckCsv } from "./deckCsv";
 import {
   analyzeAnki,
+  analyzeSource,
+  ankiModelFields,
+  ankiNotesToSource,
   ankiToCsv,
   defaultMapping,
   isAnkiExport,
+  sourceToCsv,
   stripAnkiHtml,
 } from "./anki";
 
@@ -73,6 +77,59 @@ describe("stripAnkiHtml", () => {
     expect(stripAnkiHtml("a&nbsp;b &amp; c")).toBe("a b & c");
     expect(stripAnkiHtml("hi[sound:audio.mp3]")).toBe("hi");
     expect(stripAnkiHtml('<img src="x.png">word')).toBe("word");
+  });
+});
+
+describe("ankiModelFields (.apkg col.models JSON)", () => {
+  const models = JSON.stringify({
+    "123": { name: "Basic", flds: [{ name: "Front", ord: 0 }, { name: "Back", ord: 1 }] },
+    "999": { name: "Other", flds: [{ name: "X", ord: 0 }] },
+  });
+
+  it("returns a model's field names ordered by ord", () => {
+    expect(ankiModelFields(models, "123")).toEqual(["Front", "Back"]);
+  });
+
+  it("tolerates out-of-order flds", () => {
+    const m = JSON.stringify({ "1": { flds: [{ name: "B", ord: 1 }, { name: "A", ord: 0 }] } });
+    expect(ankiModelFields(m, "1")).toEqual(["A", "B"]);
+  });
+
+  it("returns [] for empty or invalid models json", () => {
+    expect(ankiModelFields("{}", "123")).toEqual([]);
+    expect(ankiModelFields("not json", "123")).toEqual([]);
+  });
+});
+
+describe("ankiNotesToSource (.apkg notes)", () => {
+  const models = JSON.stringify({
+    "1": { name: "Verb", flds: [{ name: "Infinitiv", ord: 0 }, { name: "Bedeutung", ord: 1 }] },
+  });
+
+  it("splits flds on the \\x1f separator and uses the dominant model's fields", () => {
+    const src = ankiNotesToSource(models, [
+      { mid: "1", flds: "seinto be" },
+      { mid: "1", flds: "habento have" },
+    ]);
+    expect(src.fieldNames).toEqual(["Infinitiv", "Bedeutung"]);
+    expect(src.rows).toEqual([
+      ["sein", "to be"],
+      ["haben", "to have"],
+    ]);
+    expect(src.html).toBe(true); // Anki note fields are HTML
+  });
+
+  it("feeds the mapping pipeline and strips HTML through parseDeckCsv", () => {
+    const src = ankiNotesToSource(
+      JSON.stringify({ "1": { flds: [{ name: "Front", ord: 0 }, { name: "Back", ord: 1 }] } }),
+      [{ mid: "1", flds: "Hund<b>dog</b>[sound:hund.mp3]" }],
+    );
+    const analysis = analyzeSource(src);
+    expect(analysis.columnCount).toBe(2);
+    expect(analysis.fieldNames).toEqual(["Front", "Back"]);
+
+    const parsed = parseDeckCsv(sourceToCsv(src, ["term", "translation"]));
+    expect(parsed.cards[0]).toMatchObject({ term: "Hund", translation: "dog" });
   });
 });
 

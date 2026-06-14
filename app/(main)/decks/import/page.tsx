@@ -86,10 +86,11 @@ export default async function ImportPage({
       <ImportWizard decks={decks} initialDeckId={sp.deck} />
 
       <p className="mt-6 text-[0.8rem] font-medium text-muted">
-        <b className="text-ink">Coming from Anki?</b> Export with{" "}
-        <span className="font-bold">File → Export → Notes in Plain Text (.txt)</span> and upload
-        it here — LexaDeck detects the format and lets you map each column to a field (HTML and
-        media references are cleaned up automatically).
+        <b className="text-ink">Coming from Anki?</b> Upload a deck file{" "}
+        (<span className="font-bold">.apkg</span>, e.g. an AnkiWeb download) or a{" "}
+        <span className="font-bold">Notes in Plain Text (.txt)</span> export — LexaDeck reads the
+        cards and lets you map each Anki field to a LexaDeck field (HTML and media references are
+        cleaned up automatically; audio/images aren’t imported yet).
       </p>
 
       <section className="mt-10">

@@ -4,15 +4,17 @@ import { useActionState, useState } from "react";
 import { importCards, type ImportState } from "@/lib/actions/import";
 import {
   ANKI_FIELD_OPTIONS,
-  analyzeAnki,
-  ankiToCsv,
+  analyzeSource,
   defaultMapping,
   isAnkiExport,
+  parseAnkiText,
+  sourceToCsv,
   stripAnkiHtml,
-  type AnkiAnalysis,
   type AnkiFieldChoice,
   type AnkiMapping,
+  type AnkiSource,
 } from "@/lib/import/anki";
+import { isApkgName } from "@/lib/import/apkg";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
@@ -50,8 +52,10 @@ export function ImportWizard({
   const [state, formAction, pending] = useActionState<ImportState, FormData>(importCards, {});
   const [csvText, setCsvText] = useState("");
   const [fileName, setFileName] = useState("");
-  const [anki, setAnki] = useState<AnkiAnalysis | null>(null);
+  const [ankiSource, setAnkiSource] = useState<AnkiSource | null>(null);
   const [mapping, setMapping] = useState<AnkiMapping>([]);
+  const [apkgLoading, setApkgLoading] = useState(false);
+  const [apkgError, setApkgError] = useState<string | null>(null);
   const [target, setTarget] = useState(
     initialDeckId && decks.some((d) => d.id === initialDeckId)
       ? initialDeckId
@@ -61,11 +65,12 @@ export function ImportWizard({
 
   const { error, preview, result } = state;
 
-  // Anki exports get mapped to the canonical CSV the server already understands;
-  // plain CSV/TSV passes straight through.
-  const submittedCsv = anki ? ankiToCsv(csvText, mapping) : csvText;
-  const hasTerm = !anki || mapping.includes("term");
-  const ready = !!csvText && hasTerm;
+  // Anki sources (.txt or .apkg) map to the canonical CSV the server already
+  // understands; plain CSV/TSV passes straight through.
+  const anki = ankiSource ? analyzeSource(ankiSource) : null;
+  const submittedCsv = ankiSource ? sourceToCsv(ankiSource, mapping) : csvText;
+  const hasTerm = !ankiSource || mapping.includes("term");
+  const ready = !apkgLoading && hasTerm && !!submittedCsv;
 
   return (
     <form
@@ -82,23 +87,44 @@ export function ImportWizard({
 
       <div className="border-[1.5px] border-line">
         <label className="block border-b border-soft px-5 py-3.5">
-          <span className="label-caps text-muted">CSV file</span>
+          <span className="label-caps text-muted">Import file</span>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <input
               type="file"
-              accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+              accept=".csv,.tsv,.txt,.apkg,text/csv,text/tab-separated-values"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+                setFileName(file.name);
+                setApkgError(null);
+                // .apkg: a zip with a SQLite collection — parsed lazily in the browser
+                if (isApkgName(file.name)) {
+                  setCsvText("");
+                  setApkgLoading(true);
+                  try {
+                    const { parseApkg } = await import("@/lib/import/apkg");
+                    const src = await parseApkg(await file.arrayBuffer());
+                    setAnkiSource(src);
+                    setMapping(defaultMapping(analyzeSource(src)));
+                  } catch (err) {
+                    setAnkiSource(null);
+                    setMapping([]);
+                    setApkgError(
+                      err instanceof Error ? err.message : "Could not read this .apkg file.",
+                    );
+                  } finally {
+                    setApkgLoading(false);
+                  }
+                  return;
+                }
                 const text = await file.text();
                 setCsvText(text);
-                setFileName(file.name);
                 if (isAnkiExport(text)) {
-                  const analysis = analyzeAnki(text);
-                  setAnki(analysis);
-                  setMapping(defaultMapping(analysis));
+                  const src = parseAnkiText(text);
+                  setAnkiSource(src);
+                  setMapping(defaultMapping(analyzeSource(src)));
                 } else {
-                  setAnki(null);
+                  setAnkiSource(null);
                   setMapping([]);
                 }
               }}
@@ -110,12 +136,23 @@ export function ImportWizard({
           </div>
         </label>
 
+        {apkgLoading && (
+          <div className="border-b border-soft px-5 py-3.5">
+            <span className="label-caps text-muted">Reading Anki deck…</span>
+          </div>
+        )}
+        {apkgError && (
+          <div className="border-b border-soft px-5 py-3.5">
+            <p className="text-sm font-bold text-coral">{apkgError}</p>
+          </div>
+        )}
+
         {anki && (
           <div className="border-b border-soft px-5 py-3.5">
-            <div className="label-caps mb-1 text-muted">Anki export · map columns</div>
+            <div className="label-caps mb-1 text-muted">Anki import · map fields</div>
             <p className="mb-3 text-[0.8rem] font-medium text-muted">
-              This file has no header row. Choose which field each column maps to —
-              {anki.html ? " HTML is stripped automatically." : " values import as-is."}
+              Choose which LexaDeck field each Anki column maps to.
+              {anki.html ? " HTML and media references are cleaned up automatically." : ""}
             </p>
             <div className="space-y-2.5">
               {Array.from({ length: anki.columnCount }).map((_, i) => (

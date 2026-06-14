@@ -108,8 +108,26 @@ function parseAnki(text: string): AnkiParse {
   return { separator, html, fieldNames, ignoreColumns, rows };
 }
 
+/**
+ * A normalized view of a set of Anki notes — the shared shape produced by BOTH
+ * the .txt parser and the .apkg reader, consumed by the mapping UI + CSV builder.
+ */
+export interface AnkiSource {
+  fieldNames: string[] | null;
+  rows: string[][];
+  html: boolean;
+  ignoreColumns: number[];
+}
+
+/** Parse a .txt "Notes in Plain Text" export into the shared source shape. */
+export function parseAnkiText(text: string): AnkiSource {
+  const { fieldNames, rows, html, ignoreColumns } = parseAnki(text);
+  return { fieldNames, rows, html, ignoreColumns };
+}
+
 export interface AnkiAnalysis {
-  separator: string;
+  /** present only for the .txt path; .apkg has no text delimiter */
+  separator?: string;
   html: boolean;
   fieldNames: string[] | null;
   columnCount: number;
@@ -118,22 +136,21 @@ export interface AnkiAnalysis {
   sampleRows: string[][];
 }
 
+export function analyzeSource(src: AnkiSource): AnkiAnalysis {
+  const columnCount = Math.max(src.fieldNames?.length ?? 0, ...src.rows.map((r) => r.length), 0);
+  return {
+    html: src.html,
+    fieldNames: src.fieldNames,
+    columnCount,
+    dataRowCount: src.rows.length,
+    ignoreColumns: src.ignoreColumns,
+    sampleRows: src.rows.slice(0, 5),
+  };
+}
+
 export function analyzeAnki(text: string): AnkiAnalysis {
   const p = parseAnki(text);
-  const columnCount = Math.max(
-    p.fieldNames?.length ?? 0,
-    ...p.rows.map((r) => r.length),
-    0,
-  );
-  return {
-    separator: p.separator,
-    html: p.html,
-    fieldNames: p.fieldNames,
-    columnCount,
-    dataRowCount: p.rows.length,
-    ignoreColumns: p.ignoreColumns,
-    sampleRows: p.rows.slice(0, 5),
-  };
+  return { ...analyzeSource(p), separator: p.separator };
 }
 
 /** Best-guess column→field mapping to pre-fill the wizard's selectors. */
@@ -176,18 +193,17 @@ export function stripAnkiHtml(s: string): string {
 }
 
 /**
- * Apply the column mapping and emit a canonical CSV string (the same schema
- * `parseDeckCsv` expects). Multiple columns mapped to one field are joined with
- * newlines; HTML is stripped when the export declared `#html:true`.
+ * Apply the column mapping to a source and emit a canonical CSV string (the
+ * schema `parseDeckCsv` expects). Multiple columns mapped to one field are
+ * joined with newlines; HTML is stripped when `src.html` is set.
  */
-export function ankiToCsv(text: string, mapping: AnkiMapping): string {
-  const p = parseAnki(text);
-  const clean = (s: string) => (p.html ? stripAnkiHtml(s) : s.trim());
+export function sourceToCsv(src: AnkiSource, mapping: AnkiMapping): string {
+  const clean = (s: string) => (src.html ? stripAnkiHtml(s) : s.trim());
 
   const usedFields = FIELD_HEADERS.filter(([field]) => mapping.includes(field));
   const header = usedFields.map(([, label]) => label);
 
-  const rows = p.rows.map((cells) =>
+  const rows = src.rows.map((cells) =>
     usedFields.map(([field]) => {
       const parts: string[] = [];
       mapping.forEach((choice, col) => {
@@ -201,4 +217,61 @@ export function ankiToCsv(text: string, mapping: AnkiMapping): string {
   );
 
   return Papa.unparse({ fields: header, data: rows });
+}
+
+/** .txt convenience wrapper around {@link sourceToCsv}. */
+export function ankiToCsv(text: string, mapping: AnkiMapping): string {
+  return sourceToCsv(parseAnkiText(text), mapping);
+}
+
+/* ------------------------------------------------------------------ */
+/* .apkg collection (SQLite) → source                                  */
+/* ------------------------------------------------------------------ */
+
+const FLD_SEP = ""; // Anki joins a note's fields with the unit separator
+
+/**
+ * Ordered field names for a note type, from Anki's `col.models` JSON. Falls
+ * back to the first model when the id is missing; returns [] if unparseable
+ * (e.g. the modern schema where models live in separate tables).
+ */
+export function ankiModelFields(modelsJson: string, mid: string): string[] {
+  let models: Record<string, { flds?: { name?: string; ord?: number }[] }> | null;
+  try {
+    models = JSON.parse(modelsJson);
+  } catch {
+    return [];
+  }
+  if (!models || typeof models !== "object") return [];
+  const model = models[mid] ?? Object.values(models)[0];
+  if (!model?.flds) return [];
+  return [...model.flds].sort((a, b) => (a.ord ?? 0) - (b.ord ?? 0)).map((f) => String(f.name ?? ""));
+}
+
+/** Split \x1f-joined note fields into rows; Anki fields are HTML. */
+export function buildAnkiSource(
+  fieldNames: string[] | null,
+  notes: { flds: string }[],
+): AnkiSource {
+  return {
+    fieldNames: fieldNames && fieldNames.length ? fieldNames : null,
+    rows: notes.map((n) => n.flds.split(FLD_SEP)),
+    html: true,
+    ignoreColumns: [],
+  };
+}
+
+/**
+ * Build the shared source from raw Anki notes using `col.models` for the field
+ * names. Field names come from the note type the most notes use; every note is
+ * kept as a row.
+ */
+export function ankiNotesToSource(
+  modelsJson: string,
+  notes: { mid: string; flds: string }[],
+): AnkiSource {
+  const counts = new Map<string, number>();
+  for (const n of notes) counts.set(n.mid, (counts.get(n.mid) ?? 0) + 1);
+  const dominantMid = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+  return buildAnkiSource(ankiModelFields(modelsJson, dominantMid), notes);
 }
