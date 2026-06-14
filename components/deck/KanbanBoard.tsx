@@ -15,10 +15,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { setCardWordType } from "@/lib/actions/cards";
+import { setCardsWordType } from "@/lib/actions/cards";
+import { resolveCardTap } from "@/lib/cardTap";
+import { planCardMove } from "@/lib/kanbanMove";
+import { clearSelection, getSelectionSnapshot, toggleSelection } from "@/lib/selectionStore";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { CardActionsMenu } from "@/components/card/CardActionsMenu";
+import {
+  useCoarsePointer,
+  useHasSelection,
+  useIsSelected,
+} from "@/components/deck/useDeckSelection";
+import { useLongPress } from "@/components/deck/useLongPress";
 import type { CardRow } from "@/components/card/cardRow";
 
 const COLUMN_ORDER: WordType[] = [
@@ -41,30 +50,87 @@ function KanbanCard({
   card,
   overlay = false,
   onOpen,
+  selectionKey,
+  count = 1,
 }: {
   card: CardRow;
   overlay?: boolean;
   onOpen?: (card: CardRow) => void;
+  selectionKey?: string;
+  /** for the drag overlay: how many cards are being dragged together */
+  count?: number;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.id,
     data: { card },
   });
+  const selected = useIsSelected(selectionKey ?? "", card.id);
+  const hasSelection = useHasSelection(selectionKey ?? "");
+  const coarse = useCoarsePointer();
+  const longPress = useLongPress({
+    onLongPress: () => {
+      if (selectionKey) toggleSelection(selectionKey, card.id, card.wordType);
+    },
+  });
+
+  // true when the tap should select (shift / touch-in-mode / long-press) — not open
+  function selectsInsteadOfOpening(e: { shiftKey: boolean }): boolean {
+    if (longPress.consumedClick()) return true;
+    if (selectionKey && resolveCardTap({ shiftKey: e.shiftKey, coarse, hasSelection }) === "toggle") {
+      toggleSelection(selectionKey, card.id, card.wordType);
+      return true;
+    }
+    return false;
+  }
+
+  const dndDown = listeners?.onPointerDown;
 
   return (
     <div
       ref={overlay ? undefined : setNodeRef}
-      {...(overlay ? {} : { ...attributes, ...listeners })}
-      onClick={() => onOpen?.(card)}
-      className={`group flex items-center justify-between gap-2 border-b border-soft bg-bg px-3.5 py-2.5 last:border-b-0 ${
+      {...(overlay ? {} : attributes)}
+      // compose the dnd pointer-down with the long-press detector (touch select)
+      onPointerDown={
+        overlay
+          ? undefined
+          : (e) => {
+              dndDown?.(e);
+              if (selectionKey) longPress.handlers.onPointerDown(e);
+            }
+      }
+      onPointerMove={overlay || !selectionKey ? undefined : longPress.handlers.onPointerMove}
+      onPointerUp={overlay || !selectionKey ? undefined : longPress.handlers.onPointerUp}
+      onPointerCancel={overlay || !selectionKey ? undefined : longPress.handlers.onPointerCancel}
+      // shift+mousedown would extend the page's text selection — suppress it
+      onMouseDown={(e) => {
+        if (!overlay && selectionKey && e.shiftKey) e.preventDefault();
+      }}
+      onClick={(e) => {
+        if (overlay) return;
+        if (selectsInsteadOfOpening(e)) {
+          e.preventDefault();
+          return;
+        }
+        onOpen?.(card);
+      }}
+      className={`group relative flex items-center justify-between gap-2 border-b border-soft bg-bg px-3.5 py-2.5 last:border-b-0 ${
         isDragging && !overlay ? "opacity-30" : ""
-      } ${overlay ? "border-[1.5px] border-line shadow-[4px_4px_0_0_var(--c-soft)]" : "cursor-pointer hover:bg-soft/40"}`}
+      } ${overlay ? "border-[1.5px] border-line shadow-[4px_4px_0_0_var(--c-soft)]" : "cursor-pointer hover:bg-soft/40"} ${
+        selected && !overlay ? "bg-soft/60 ring-1 ring-ink ring-inset" : ""
+      }`}
     >
       <div className="min-w-0">
         <Link
           href={`/decks/${card.deckId}/cards/${card.id}`}
           className="type-term block truncate text-[0.95rem] hover:text-coral"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            if (selectsInsteadOfOpening(e)) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+            e.stopPropagation(); // plain open: let the Link navigate, skip the card handler
+          }}
           draggable={false}
         >
           {card.term}
@@ -88,6 +154,11 @@ function KanbanCard({
           style={{ background: srsStateVar(card.srs) }}
         />
       </div>
+      {overlay && count > 1 && (
+        <span className="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center bg-ink px-1 text-[0.7rem] font-bold text-bg">
+          {count}
+        </span>
+      )}
     </div>
   );
 }
@@ -131,7 +202,7 @@ function KanbanColumn({
         }`}
       >
         {cards.slice(0, visible).map((card) => (
-          <KanbanCard key={card.id} card={card} onOpen={onOpen} />
+          <KanbanCard key={card.id} card={card} onOpen={onOpen} selectionKey={deckId} />
         ))}
         {cards.length === 0 && (
           <div className="px-3.5 py-6 text-center text-[0.74rem] font-semibold text-muted">
@@ -157,6 +228,7 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
   const [cards, setCards] = useState(initialCards);
   const [prevInitial, setPrevInitial] = useState(initialCards);
   const [active, setActive] = useState<CardRow | null>(null);
+  const [multiCount, setMultiCount] = useState(1); // # cards dragging together (overlay badge)
   const [, startTransition] = useTransition();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
@@ -231,7 +303,10 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
   }, [cards]);
 
   function onDragStart(event: DragStartEvent) {
-    setActive((event.active.data.current?.card as CardRow) ?? null);
+    const card = (event.active.data.current?.card as CardRow) ?? null;
+    setActive(card);
+    const sel = getSelectionSnapshot(deckId);
+    setMultiCount(card && sel.has(card.id) ? sel.size : 1);
   }
 
   function onDragEnd(event: DragEndEvent) {
@@ -240,16 +315,23 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
     setTimeout(() => (justDragged.current = false), 50);
     const card = event.active.data.current?.card as CardRow | undefined;
     const target = event.over?.id as WordType | undefined;
-    if (!card || !target || card.wordType === target) return;
+    if (!card || !target) return;
+
+    // dragging a SELECTED card moves the whole selection; dragging an UNSELECTED
+    // card moves just it and clears any existing selection (see planCardMove)
+    const selectedIds = new Set(getSelectionSnapshot(deckId).keys());
+    const { moveIds, clearSelection: shouldClear } = planCardMove(card.id, target, selectedIds, cards);
+    if (shouldClear) clearSelection(deckId);
+    if (moveIds.length === 0) return;
 
     setCards((prev) =>
       prev.map((c) =>
-        c.id === card.id
+        moveIds.includes(c.id)
           ? { ...c, wordType: target, gender: target === "NOUN" ? c.gender : null }
           : c,
       ),
     );
-    startTransition(() => setCardWordType(card.id, target));
+    startTransition(() => setCardsWordType(moveIds, target));
   }
 
   const canScroll = overflow.left || overflow.right;
@@ -326,7 +408,7 @@ export function KanbanBoard({ cards: initialCards, deckId }: { cards: CardRow[];
           )}
         </div>
       </div>
-      <DragOverlay>{active && <KanbanCard card={active} overlay />}</DragOverlay>
+      <DragOverlay>{active && <KanbanCard card={active} overlay count={multiCount} />}</DragOverlay>
     </DndContext>
   );
 }

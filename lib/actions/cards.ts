@@ -171,35 +171,6 @@ export async function updateCard(
   redirect(`/decks/${card.deckId}/cards/${cardId}`);
 }
 
-/** Inline edit from the list view — term/translation only. */
-export async function updateCardInline(
-  cardId: string,
-  field: "term" | "translation",
-  value: string,
-): Promise<{ error?: string }> {
-  const trimmed = value.trim();
-  if (field === "term" && !trimmed) return { error: "Term cannot be empty" };
-
-  const user = await requireUser();
-  const existing = await prisma.card.findFirst({
-    where: { id: cardId, deck: { userId: user.id } },
-    select: { details: true },
-  });
-  if (!existing) return { error: "Card not found" };
-
-  const data: Record<string, unknown> = {
-    [field]: field === "translation" && !trimmed ? null : trimmed,
-  };
-  // editing term/translation invalidates a spelling flag
-  if (getCardDetails(existing.details).correction) {
-    data.details = withoutCorrection(existing.details);
-  }
-
-  const card = await prisma.card.update({ where: { id: cardId }, data });
-  revalidateCardPaths(card.deckId);
-  return {};
-}
-
 /** Kanban drag-and-drop reclassification. */
 export async function setCardWordType(
   cardId: string,
@@ -210,6 +181,24 @@ export async function setCardWordType(
   if (wordType !== "NOUN") data.gender = null;
   const card = await prisma.card.update({ where: { id: cardId }, data });
   revalidateCardPaths(card.deckId);
+}
+
+/** Kanban multi-card drag: reclassify a whole selection at once (ownership-scoped). */
+export async function setCardsWordType(
+  cardIds: string[],
+  wordType: WordType,
+): Promise<void> {
+  if (cardIds.length === 0) return;
+  const user = await requireUser();
+  const owned = { deck: { userId: user.id } };
+  const data: { wordType: WordType; gender?: null } = { wordType };
+  if (wordType !== "NOUN") data.gender = null;
+  const first = await prisma.card.findFirst({
+    where: { id: cardIds[0], ...owned },
+    select: { deckId: true },
+  });
+  await prisma.card.updateMany({ where: { id: { in: cardIds }, ...owned }, data });
+  if (first) revalidateCardPaths(first.deckId);
 }
 
 /**
@@ -607,6 +596,47 @@ export async function conjugateVerbs(
   }
   if (results.some((r) => r.ok)) revalidateCardPaths(deckId);
   return { results, quotaExhausted };
+}
+
+export interface ResolvedEnrichSelection {
+  /** owned, non-grammar card ids from the selection — safe to enrich */
+  enrichIds: string[];
+  /** of those, verbs still lacking a cached conjugation table (opt-in pass) */
+  verbIdsWithoutTable: string[];
+  /** selected ids that won't be enriched (grammar / not owned / wrong deck) */
+  skipped: number;
+}
+
+/**
+ * Resolve a hand-picked selection of card ids (from the deck views) into what
+ * the batch engine can act on: drops GRAMMAR / non-owned / wrong-deck ids and
+ * lists verbs that still need a conjugation table. Keeps counts honest even when
+ * the selection spans pages (off-page ids aren't known client-side). No AI;
+ * Spanish decks only.
+ */
+export async function resolveEnrichSelection(
+  deckId: string,
+  cardIds: string[],
+): Promise<{ resolved?: ResolvedEnrichSelection; error?: string }> {
+  const gate = await requireEsDeck(deckId);
+  if ("error" in gate) return { error: gate.error };
+  if (cardIds.length === 0) {
+    return { resolved: { enrichIds: [], verbIdsWithoutTable: [], skipped: 0 } };
+  }
+
+  const cards = await prisma.card.findMany({
+    where: { id: { in: cardIds }, deckId, deck: { userId: gate.userId }, wordType: NON_GRAMMAR },
+    select: { id: true, wordType: true, details: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const enrichIds = cards.map((c) => c.id);
+  const verbIdsWithoutTable = cards
+    .filter((c) => c.wordType === "VERB" && !getCardDetails(c.details).conjugationTable)
+    .map((c) => c.id);
+
+  return {
+    resolved: { enrichIds, verbIdsWithoutTable, skipped: cardIds.length - enrichIds.length },
+  };
 }
 
 /** Manual mastery: a mastered card never enters study sessions. */

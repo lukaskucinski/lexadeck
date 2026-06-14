@@ -8,9 +8,11 @@ import { FilterPanel } from "@/components/card/FilterPanel";
 import { FlashCardPreview } from "@/components/card/FlashCardPreview";
 import { Pagination } from "@/components/card/Pagination";
 import { SearchBar } from "@/components/card/SearchBar";
+import { DeckSelectionBar } from "@/components/deck/DeckSelectionBar";
 import { EnrichPanel } from "@/components/deck/EnrichPanel";
 import { KanbanBoard } from "@/components/deck/KanbanBoard";
 import { LastDeckCookie } from "@/components/deck/LastDeckCookie";
+import { SelectHint } from "@/components/deck/SelectHint";
 import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -99,7 +101,7 @@ export default async function DeckDetailPage({
     } else if (vp.view === "list") {
       content = (
         <>
-          <CardListTable cards={rows} sort={vp.sort} dir={vp.dir} />
+          <CardListTable cards={rows} sort={vp.sort} dir={vp.dir} selectionKey={id} />
           <Pagination page={vp.page} pageSize={PAGE_SIZE} total={filteredTotal} />
         </>
       );
@@ -108,7 +110,7 @@ export default async function DeckDetailPage({
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {rows.map((card) => (
-              <FlashCardPreview key={card.id} card={card} />
+              <FlashCardPreview key={card.id} card={card} selectionKey={id} />
             ))}
           </div>
           <Pagination page={vp.page} pageSize={PAGE_SIZE} total={filteredTotal} />
@@ -120,6 +122,7 @@ export default async function DeckDetailPage({
   return (
     <div>
       <LastDeckCookie deckId={id} />
+      <DeckSelectionBar deckId={id} enrichEnabled={deck.language === "es"} />
       {/* /decks auto-opens this deck again — ?all=1 suppresses the redirect */}
       <nav className="label-caps mb-4">
         <Link href="/decks?all=1" className="text-muted hover:text-ink">
@@ -161,7 +164,10 @@ export default async function DeckDetailPage({
       </header>
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <ViewToggle active={vp.view} />
+        <div className="flex items-center gap-3">
+          <ViewToggle active={vp.view} />
+          <SelectHint />
+        </div>
         <div className="flex items-center gap-3">
           <SearchBar />
           <FilterPanel />
