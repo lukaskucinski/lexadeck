@@ -3,6 +3,7 @@ import { CardListTable } from "@/components/card/CardListTable";
 import { FilterPanel } from "@/components/card/FilterPanel";
 import { Pagination } from "@/components/card/Pagination";
 import { SearchBar } from "@/components/card/SearchBar";
+import { SortControl } from "@/components/card/SortControl";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireUser } from "@/lib/auth";
@@ -46,6 +47,7 @@ export default async function LibraryPage({
     <div>
       <PageHeader title="library">
         <SearchBar />
+        <SortControl />
         <FilterPanel decks={decks} />
       </PageHeader>
 

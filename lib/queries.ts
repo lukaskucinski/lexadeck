@@ -200,7 +200,9 @@ export function parseCardViewParams(sp: Record<string, string | string[] | undef
 
   const view = (["kanban", "grid", "list"] as const).find((v) => v === get("view")) ?? "kanban";
   const sort = (["term", "createdAt", "due", "wordType"] as const).find((s) => s === get("sort")) ?? "createdAt";
-  const dir = get("dir") === "desc" ? "desc" : "asc";
+  // default ordering is "Recently added" (createdAt desc); the Sort control and
+  // list-view headers always set dir explicitly
+  const dir = get("dir") === "asc" ? "asc" : "desc";
   const page = Math.max(1, Number(get("page")) || 1);
 
   const ht = get("ht");
