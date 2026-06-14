@@ -89,7 +89,7 @@ const JA: LanguageProfile = {
       'the kana reading of the term followed by romaji in parentheses, e.g. "いぬ (inu)" or "食べる → たべる (taberu)"',
   },
   conjugation: {
-    table: false,
+    table: true,
     summaryNote:
       "a compact summary of the key forms: dictionary/plain, polite (-masu), past, te-form, and negative",
   },
@@ -109,7 +109,7 @@ const DE: LanguageProfile = {
   },
   reading: { enabled: false, promptNote: "" },
   conjugation: {
-    table: false,
+    table: true,
     summaryNote:
       "a compact present-tense summary with ich/du/er/wir/ihr/sie forms, noting any separable prefix and key irregulars",
   },

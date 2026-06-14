@@ -18,7 +18,11 @@ import {
   getCardDetails,
   withoutCorrection,
 } from "@/lib/cardDetails";
-import { buildConjugationTable, type ConjTable, normalizeSimpleConjugation } from "@/lib/conjugation";
+import {
+  type ConjugationData,
+  type ConjugationSpec,
+  getConjugationSpec,
+} from "@/lib/conjugation";
 import { prisma } from "@/lib/db";
 import { sanitizeEmoji } from "@/lib/emoji";
 import { type EnrichTargetBucket, isQuotaError } from "@/lib/enrichBatch";
@@ -336,20 +340,19 @@ export async function previewEnrichment(
 }
 
 /**
- * Generate + cache the full conjugation table for one verb card record. Gemini
- * returns only the SIMPLE forms; lib/conjugation.ts derives every compound tense
- * from the participle + the fixed `haber` paradigm. A cached table is returned
- * untouched. The caller owns auth + the VERB/es gate.
+ * Generate + cache the full conjugation table for one verb card record, using
+ * the language's ConjugationSpec (spec.build turns the AI's raw JSON into the
+ * display table; Spanish derives its compound tenses there). A cached table is
+ * returned untouched. The caller owns auth + the VERB / language gate.
  */
-async function buildAndCacheConjugation(card: {
-  id: string;
-  term: string;
-  details: unknown;
-}): Promise<ConjTable> {
+async function buildAndCacheConjugation(
+  card: { id: string; term: string; details: unknown },
+  spec: ConjugationSpec,
+): Promise<ConjugationData> {
   const existing = getCardDetails(card.details);
   if (existing.conjugationTable) return existing.conjugationTable;
-  const raw = await geminiConjugate(card.term);
-  const table = buildConjugationTable(card.term, normalizeSimpleConjugation(raw));
+  const raw = await geminiConjugate(card.term, spec);
+  const table = spec.build(card.term, raw);
   await prisma.card.update({
     where: { id: card.id },
     data: { details: { ...existing, conjugationTable: table } },
@@ -359,11 +362,11 @@ async function buildAndCacheConjugation(card: {
 
 /**
  * Generate (and cache) the full conjugation table for a verb card, on demand.
- * Spanish verbs only.
+ * Available for any language with a ConjugationSpec (es/ja/de).
  */
 export async function conjugateVerb(
   cardId: string,
-): Promise<{ table?: ConjTable; error?: string }> {
+): Promise<{ table?: ConjugationData; error?: string }> {
   const user = await requireUser();
   const card = await prisma.card.findFirst({
     where: { id: cardId, deck: { userId: user.id } },
@@ -371,12 +374,11 @@ export async function conjugateVerb(
   });
   if (!card) return { error: "Card not found" };
   if (card.wordType !== "VERB") return { error: "Only verbs can be conjugated" };
-  if (card.deck.language !== "es") {
-    return { error: "Conjugation currently supports Spanish verbs only" };
-  }
+  const spec = getConjugationSpec(card.deck.language);
+  if (!spec) return { error: "Conjugation isn't available for this language yet" };
 
   try {
-    const table = await buildAndCacheConjugation(card);
+    const table = await buildAndCacheConjugation(card, spec);
     revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
     return { table };
   } catch (err) {
@@ -584,7 +586,8 @@ export async function conjugateVerbs(
 ): Promise<{ results: CardEnrichResult[]; quotaExhausted: boolean; error?: string }> {
   const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { results: [], quotaExhausted: false, error: gate.error };
-  if (!gate.profile.conjugation.table) {
+  const spec = getConjugationSpec(gate.profile.code);
+  if (!gate.profile.conjugation.table || !spec) {
     return {
       results: [],
       quotaExhausted: false,
@@ -602,7 +605,7 @@ export async function conjugateVerbs(
   let quotaExhausted = false;
   for (const verb of verbs) {
     try {
-      await buildAndCacheConjugation(verb);
+      await buildAndCacheConjugation(verb, spec);
       results.push({ id: verb.id, ok: true });
     } catch (err) {
       const message = (err as Error).message ?? "conjugation failed";

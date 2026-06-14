@@ -78,10 +78,10 @@ describe("reading rules", () => {
 });
 
 describe("conjugation capability", () => {
-  it("Spanish has a structured table in Phase 1; ja/de get a summary only (until Phase 2)", () => {
+  it("es/ja/de all have structured conjugation tables", () => {
     expect(getLanguageProfile("es")!.conjugation.table).toBe(true);
-    expect(getLanguageProfile("ja")!.conjugation.table).toBe(false);
-    expect(getLanguageProfile("de")!.conjugation.table).toBe(false);
+    expect(getLanguageProfile("ja")!.conjugation.table).toBe(true);
+    expect(getLanguageProfile("de")!.conjugation.table).toBe(true);
   });
 
   it("every language has a verb-summary prompt note", () => {
