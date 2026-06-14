@@ -28,6 +28,24 @@ describe("parseCardViewParams facet parsing", () => {
   });
 });
 
+describe("parseCardViewParams sort/dir", () => {
+  it("defaults to recently-added (createdAt desc) with no params", () => {
+    const vp = parseCardViewParams({});
+    expect(vp.sort).toBe("createdAt");
+    expect(vp.dir).toBe("desc");
+  });
+
+  it("honors an explicit sort + direction", () => {
+    const vp = parseCardViewParams({ sort: "term", dir: "asc" });
+    expect(vp.sort).toBe("term");
+    expect(vp.dir).toBe("asc");
+  });
+
+  it("falls back to createdAt for an unknown sort key", () => {
+    expect(parseCardViewParams({ sort: "bogus" }).sort).toBe("createdAt");
+  });
+});
+
 describe("buildCardWhere", () => {
   it("no filters → empty where (everything matches)", () => {
     expect(buildCardWhere({})).toEqual({});
