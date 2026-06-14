@@ -16,12 +16,18 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { setCardsWordType } from "@/lib/actions/cards";
+import { resolveCardTap } from "@/lib/cardTap";
 import { planCardMove } from "@/lib/kanbanMove";
 import { clearSelection, getSelectionSnapshot, toggleSelection } from "@/lib/selectionStore";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS, WordType } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { CardActionsMenu } from "@/components/card/CardActionsMenu";
-import { useIsSelected } from "@/components/deck/useDeckSelection";
+import {
+  useCoarsePointer,
+  useHasSelection,
+  useIsSelected,
+} from "@/components/deck/useDeckSelection";
+import { useLongPress } from "@/components/deck/useLongPress";
 import type { CardRow } from "@/components/card/cardRow";
 
 const COLUMN_ORDER: WordType[] = [
@@ -59,21 +65,50 @@ function KanbanCard({
     data: { card },
   });
   const selected = useIsSelected(selectionKey ?? "", card.id);
+  const hasSelection = useHasSelection(selectionKey ?? "");
+  const coarse = useCoarsePointer();
+  const longPress = useLongPress({
+    onLongPress: () => {
+      if (selectionKey) toggleSelection(selectionKey, card.id, card.wordType);
+    },
+  });
+
+  // true when the tap should select (shift / touch-in-mode / long-press) — not open
+  function selectsInsteadOfOpening(e: { shiftKey: boolean }): boolean {
+    if (longPress.consumedClick()) return true;
+    if (selectionKey && resolveCardTap({ shiftKey: e.shiftKey, coarse, hasSelection }) === "toggle") {
+      toggleSelection(selectionKey, card.id, card.wordType);
+      return true;
+    }
+    return false;
+  }
+
+  const dndDown = listeners?.onPointerDown;
 
   return (
     <div
       ref={overlay ? undefined : setNodeRef}
-      {...(overlay ? {} : { ...attributes, ...listeners })}
+      {...(overlay ? {} : attributes)}
+      // compose the dnd pointer-down with the long-press detector (touch select)
+      onPointerDown={
+        overlay
+          ? undefined
+          : (e) => {
+              dndDown?.(e);
+              if (selectionKey) longPress.handlers.onPointerDown(e);
+            }
+      }
+      onPointerMove={overlay || !selectionKey ? undefined : longPress.handlers.onPointerMove}
+      onPointerUp={overlay || !selectionKey ? undefined : longPress.handlers.onPointerUp}
+      onPointerCancel={overlay || !selectionKey ? undefined : longPress.handlers.onPointerCancel}
       // shift+mousedown would extend the page's text selection — suppress it
-      // (dnd uses pointer events, so this doesn't affect dragging)
       onMouseDown={(e) => {
         if (!overlay && selectionKey && e.shiftKey) e.preventDefault();
       }}
       onClick={(e) => {
-        // shift-click selects instead of opening
-        if (!overlay && selectionKey && e.shiftKey) {
+        if (overlay) return;
+        if (selectsInsteadOfOpening(e)) {
           e.preventDefault();
-          toggleSelection(selectionKey, card.id, card.wordType);
           return;
         }
         onOpen?.(card);
@@ -89,13 +124,12 @@ function KanbanCard({
           href={`/decks/${card.deckId}/cards/${card.id}`}
           className="type-term block truncate text-[0.95rem] hover:text-coral"
           onClick={(e) => {
-            if (selectionKey && e.shiftKey) {
+            if (selectsInsteadOfOpening(e)) {
               e.preventDefault();
               e.stopPropagation();
-              toggleSelection(selectionKey, card.id, card.wordType);
               return;
             }
-            e.stopPropagation();
+            e.stopPropagation(); // plain open: let the Link navigate, skip the card handler
           }}
           draggable={false}
         >

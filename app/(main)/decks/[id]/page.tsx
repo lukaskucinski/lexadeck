@@ -12,6 +12,7 @@ import { DeckSelectionBar } from "@/components/deck/DeckSelectionBar";
 import { EnrichPanel } from "@/components/deck/EnrichPanel";
 import { KanbanBoard } from "@/components/deck/KanbanBoard";
 import { LastDeckCookie } from "@/components/deck/LastDeckCookie";
+import { SelectHint } from "@/components/deck/SelectHint";
 import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -165,7 +166,7 @@ export default async function DeckDetailPage({
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <ViewToggle active={vp.view} />
-          <span className="label-caps hidden text-muted/60 lg:inline">⇧-click to select</span>
+          <SelectHint />
         </div>
         <div className="flex items-center gap-3">
           <SearchBar />

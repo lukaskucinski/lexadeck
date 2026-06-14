@@ -51,3 +51,25 @@ export function useIsSelected(key: string, id: string): boolean {
     () => false,
   );
 }
+
+/** True when the deck has any cards selected — drives touch's tap-to-toggle mode. */
+export function useHasSelection(key: string): boolean {
+  return useSyncExternalStore(
+    subscribeSelection,
+    () => getSelectionSnapshot(key).size > 0,
+    () => false,
+  );
+}
+
+/** True on touch-first ("coarse pointer") devices — gates the mobile gestures. */
+export function useCoarsePointer(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia("(pointer: coarse)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia("(pointer: coarse)").matches,
+    () => false, // SSR: assume fine pointer
+  );
+}

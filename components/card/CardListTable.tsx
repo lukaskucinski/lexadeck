@@ -4,11 +4,18 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useTransition } from "react";
 import { deleteCards } from "@/lib/actions/cards";
-import { CardActionsMenu } from "./CardActionsMenu";
+import { resolveCardTap } from "@/lib/cardTap";
+import { toggleSelection } from "@/lib/selectionStore";
 import { SRS_STATE_LABELS, WORD_TYPE_LABELS } from "@/lib/types";
 import { srsStateVar, wordTypeVar } from "@/lib/wordTypeColors";
 import { Button } from "@/components/ui/Button";
-import { useDeckSelection } from "@/components/deck/useDeckSelection";
+import {
+  useCoarsePointer,
+  useHasSelection,
+  useIsSelected,
+} from "@/components/deck/useDeckSelection";
+import { useLongPress } from "@/components/deck/useLongPress";
+import { CardActionsMenu } from "./CardActionsMenu";
 import type { CardRow } from "./cardRow";
 import { useViewParams } from "./useViewParams";
 
@@ -44,6 +51,107 @@ function SortHeader({
   );
 }
 
+/**
+ * One table row. Its own component (not inline in the map) so it can use the
+ * long-press hook per row. Deck (shared) rows: shift-click / touch long-press
+ * select, plain click/tap opens (or toggles when a selection is active on
+ * touch). Library rows: checkbox selects, click opens.
+ */
+function ListRow({
+  card,
+  selectionKey,
+  showDeck,
+  libraryChecked,
+  onLibraryToggle,
+}: {
+  card: CardRow;
+  selectionKey?: string;
+  showDeck: boolean;
+  libraryChecked: boolean;
+  onLibraryToggle: (id: string) => void;
+}) {
+  const router = useRouter();
+  const usingShared = !!selectionKey;
+  const selectedShared = useIsSelected(selectionKey ?? "", card.id);
+  const hasSelection = useHasSelection(selectionKey ?? "");
+  const coarse = useCoarsePointer();
+  const longPress = useLongPress({
+    onLongPress: () => {
+      if (selectionKey) toggleSelection(selectionKey, card.id, card.wordType);
+    },
+  });
+
+  const highlighted = usingShared && selectedShared;
+
+  return (
+    <tr
+      {...(usingShared ? longPress.handlers : {})}
+      // shift+mousedown would extend the page's text selection — suppress it
+      onMouseDown={(e) => {
+        if (usingShared && e.shiftKey) e.preventDefault();
+      }}
+      onClick={(e) => {
+        if (usingShared) {
+          if (longPress.consumedClick()) return; // a long-press just selected
+          if (resolveCardTap({ shiftKey: e.shiftKey, coarse, hasSelection }) === "toggle") {
+            toggleSelection(selectionKey!, card.id, card.wordType);
+            return;
+          }
+        }
+        router.push(`/decks/${card.deckId}/cards/${card.id}`);
+      }}
+      className={`cursor-pointer border-b border-soft last:border-b-0 ${
+        highlighted ? "bg-soft" : "hover:bg-soft/25"
+      }`}
+    >
+      {/* checkbox cell swallows the row click (library only) */}
+      {!usingShared && (
+        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={libraryChecked}
+            onChange={() => onLibraryToggle(card.id)}
+            className="accent-[var(--c-ink)]"
+          />
+        </td>
+      )}
+      <td className="px-3 py-2 font-bold">{card.term}</td>
+      <td className="px-3 py-2 text-muted">{card.translation || "—"}</td>
+      {showDeck && (
+        <td className="hidden px-3 py-2 text-[0.72rem] font-semibold text-muted md:table-cell">
+          {card.deckName}
+        </td>
+      )}
+      <td className="hidden px-3 py-2 sm:table-cell">
+        <span className="inline-flex items-center gap-2 text-[0.72rem] font-bold">
+          <i className="h-2.5 w-2.5" style={{ background: wordTypeVar(card.wordType) }} />
+          {WORD_TYPE_LABELS[card.wordType]}
+          {card.gender && (
+            <em className="not-italic text-muted">
+              {card.gender === "MASCULINE" ? "m" : card.gender === "FEMININE" ? "f" : "m·f"}
+            </em>
+          )}
+        </span>
+      </td>
+      <td className="hidden px-3 py-2 md:table-cell">
+        <span
+          className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-muted"
+          title={SRS_STATE_LABELS[card.srs]}
+        >
+          <i className="h-2.5 w-2.5" style={{ background: srsStateVar(card.srs) }} />
+          {SRS_STATE_LABELS[card.srs]}
+        </span>
+      </td>
+      <td className="tnum hidden px-3 py-2 text-[0.78rem] font-semibold text-muted sm:table-cell">
+        {dueLabel(card.due)}
+      </td>
+      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+        <CardActionsMenu cardId={card.id} deckId={card.deckId} srs={card.srs} />
+      </td>
+    </tr>
+  );
+}
+
 export function CardListTable({
   cards,
   sort,
@@ -59,14 +167,10 @@ export function CardListTable({
    *  inline delete bar yields to the floating DeckSelectionBar */
   selectionKey?: string;
 }) {
-  const router = useRouter();
   const { setParams } = useViewParams();
   const usingShared = !!selectionKey;
-  const shared = useDeckSelection(selectionKey ?? "");
   const [localSelected, setLocalSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
-
-  const selected = usingShared ? shared.selected : localSelected;
 
   function toggleSort(key: string) {
     if (sort === key) setParams({ dir: dir === "asc" ? "desc" : "asc" }, { resetPage: false });
@@ -74,7 +178,7 @@ export function CardListTable({
   }
 
   // library (local) selection via checkboxes; the deck (shared) view selects by
-  // shift-click on the row instead
+  // shift-click / long-press on the row instead
   function toggleLocal(id: string) {
     setLocalSelected((prev) => {
       const next = new Set(prev);
@@ -84,7 +188,7 @@ export function CardListTable({
     });
   }
 
-  const allSelected = cards.length > 0 && cards.every((c) => selected.has(c.id));
+  const allSelected = cards.length > 0 && cards.every((c) => localSelected.has(c.id));
 
   function toggleAll() {
     const ids = cards.map((c) => c.id);
@@ -116,94 +220,57 @@ export function CardListTable({
           (library overflowed the screen); sm+ restores them. The wrapper
           keeps any residual overflow inside the card instead of the page. */}
       <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-line text-left">
-            {!usingShared && (
-              <th className="w-10 px-3 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  className="accent-[var(--c-ink)]"
-                />
-              </th>
-            )}
-            <th className="px-3 py-2.5"><SortHeader id="term" sort={sort} dir={dir} onToggle={toggleSort}>Term</SortHeader></th>
-            <th className="px-3 py-2.5"><span className="label-caps text-muted">Translation</span></th>
-            {showDeck && <th className="hidden px-3 py-2.5 md:table-cell"><span className="label-caps text-muted">Deck</span></th>}
-            <th className="hidden px-3 py-2.5 sm:table-cell"><SortHeader id="wordType" sort={sort} dir={dir} onToggle={toggleSort}>Type</SortHeader></th>
-            <th className="hidden px-3 py-2.5 md:table-cell"><span className="label-caps text-muted">State</span></th>
-            <th className="hidden px-3 py-2.5 sm:table-cell"><SortHeader id="due" sort={sort} dir={dir} onToggle={toggleSort}>Next</SortHeader></th>
-            <th className="w-10 px-3 py-2.5" />
-          </tr>
-        </thead>
-        <tbody>
-          {cards.map((card) => (
-            <tr
-              key={card.id}
-              // shift+mousedown would extend the page's text selection — suppress it
-              onMouseDown={(e) => {
-                if (e.shiftKey) e.preventDefault();
-              }}
-              onClick={(e) => {
-                // deck view: shift-click selects; otherwise open the card
-                if (usingShared && e.shiftKey) {
-                  shared.toggle(card.id, card.wordType);
-                  return;
-                }
-                router.push(`/decks/${card.deckId}/cards/${card.id}`);
-              }}
-              className={`cursor-pointer border-b border-soft last:border-b-0 ${
-                usingShared && selected.has(card.id) ? "bg-soft" : "hover:bg-soft/25"
-              }`}
-            >
-              {/* checkbox cell swallows the row click (library only) */}
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-line text-left">
               {!usingShared && (
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <th className="w-10 px-3 py-2.5">
                   <input
                     type="checkbox"
-                    checked={selected.has(card.id)}
-                    onChange={() => toggleLocal(card.id)}
+                    checked={allSelected}
+                    onChange={toggleAll}
                     className="accent-[var(--c-ink)]"
                   />
-                </td>
+                </th>
               )}
-              <td className="px-3 py-2 font-bold">{card.term}</td>
-              <td className="px-3 py-2 text-muted">{card.translation || "—"}</td>
+              <th className="px-3 py-2.5">
+                <SortHeader id="term" sort={sort} dir={dir} onToggle={toggleSort}>
+                  Term
+                </SortHeader>
+              </th>
+              <th className="px-3 py-2.5"><span className="label-caps text-muted">Translation</span></th>
               {showDeck && (
-                <td className="hidden px-3 py-2 text-[0.72rem] font-semibold text-muted md:table-cell">{card.deckName}</td>
+                <th className="hidden px-3 py-2.5 md:table-cell">
+                  <span className="label-caps text-muted">Deck</span>
+                </th>
               )}
-              <td className="hidden px-3 py-2 sm:table-cell">
-                <span className="inline-flex items-center gap-2 text-[0.72rem] font-bold">
-                  <i className="h-2.5 w-2.5" style={{ background: wordTypeVar(card.wordType) }} />
-                  {WORD_TYPE_LABELS[card.wordType]}
-                  {card.gender && (
-                    <em className="not-italic text-muted">
-                      {card.gender === "MASCULINE" ? "m" : card.gender === "FEMININE" ? "f" : "m·f"}
-                    </em>
-                  )}
-                </span>
-              </td>
-              <td className="hidden px-3 py-2 md:table-cell">
-                <span
-                  className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-muted"
-                  title={SRS_STATE_LABELS[card.srs]}
-                >
-                  <i className="h-2.5 w-2.5" style={{ background: srsStateVar(card.srs) }} />
-                  {SRS_STATE_LABELS[card.srs]}
-                </span>
-              </td>
-              <td className="tnum hidden px-3 py-2 text-[0.78rem] font-semibold text-muted sm:table-cell">
-                {dueLabel(card.due)}
-              </td>
-              <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                <CardActionsMenu cardId={card.id} deckId={card.deckId} srs={card.srs} />
-              </td>
+              <th className="hidden px-3 py-2.5 sm:table-cell">
+                <SortHeader id="wordType" sort={sort} dir={dir} onToggle={toggleSort}>
+                  Type
+                </SortHeader>
+              </th>
+              <th className="hidden px-3 py-2.5 md:table-cell"><span className="label-caps text-muted">State</span></th>
+              <th className="hidden px-3 py-2.5 sm:table-cell">
+                <SortHeader id="due" sort={sort} dir={dir} onToggle={toggleSort}>
+                  Next
+                </SortHeader>
+              </th>
+              <th className="w-10 px-3 py-2.5" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {cards.map((card) => (
+              <ListRow
+                key={card.id}
+                card={card}
+                selectionKey={selectionKey}
+                showDeck={showDeck}
+                libraryChecked={!usingShared && localSelected.has(card.id)}
+                onLibraryToggle={toggleLocal}
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
