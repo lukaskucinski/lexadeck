@@ -9,6 +9,7 @@ const base: EnrichmentItem = {
   example: "",
   exampleEn: "",
   emoji: "",
+  reading: "",
   usagePattern: "",
   collocations: [],
   conjugation: "",
@@ -39,6 +40,12 @@ describe("detailsFromEnrichment", () => {
   it("returns {} when there is nothing to keep", () => {
     expect(detailsFromEnrichment(base)).toEqual({});
   });
+
+  it("keeps a pronunciation reading", () => {
+    expect(detailsFromEnrichment({ ...base, reading: "いぬ (inu)" })).toEqual({
+      reading: "いぬ (inu)",
+    });
+  });
 });
 
 describe("getCardDetails", () => {
@@ -57,6 +64,12 @@ describe("getCardDetails", () => {
         correction: "  ",
       }),
     ).toEqual({ usagePattern: "gozar de + noun", collocations: ["a", "b"] });
+  });
+
+  it("reads back a stored reading", () => {
+    expect(getCardDetails({ reading: " たべる (taberu) " })).toEqual({
+      reading: "たべる (taberu)",
+    });
   });
 });
 

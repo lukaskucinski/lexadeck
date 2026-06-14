@@ -11,6 +11,8 @@ import type { ConjTable } from "./conjugation";
 // A `type` (not `interface`) so TS gives it an implicit index signature and it
 // stays assignable to Prisma's Json input type at the write sites.
 export type CardDetails = {
+  /** Pronunciation reading (e.g. Japanese kana/romaji). Empty for Latin-script langs. */
+  reading?: string;
   usagePattern?: string;
   collocations?: string[];
   etymology?: string;
@@ -38,6 +40,7 @@ export interface EnrichmentPreview {
 /** Build the persisted detail object from a normalized enrichment — only non-empty fields. */
 export function detailsFromEnrichment(item: EnrichmentItem): CardDetails {
   const d: CardDetails = {};
+  if (item.reading) d.reading = item.reading;
   if (item.usagePattern) d.usagePattern = item.usagePattern;
   if (item.collocations.length) d.collocations = item.collocations;
   if (item.etymology) d.etymology = item.etymology;
@@ -58,6 +61,7 @@ export function getCardDetails(raw: unknown): CardDetails {
       ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
       : [];
 
+  if (str(r.reading)) out.reading = str(r.reading);
   if (str(r.usagePattern)) out.usagePattern = str(r.usagePattern);
   if (list(r.collocations).length) out.collocations = list(r.collocations);
   if (str(r.etymology)) out.etymology = str(r.etymology);

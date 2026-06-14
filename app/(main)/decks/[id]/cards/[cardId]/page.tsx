@@ -8,6 +8,7 @@ import { SynonymList } from "@/components/card/SynonymList";
 import { GenderBadge, SRSBadge, WordTypeBadge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { SpeakButton } from "@/components/ui/SpeakButton";
+import { getLanguageProfile, isEnrichable } from "@/lib/ai/languages";
 import { requireUser } from "@/lib/auth";
 import { getCardDetails } from "@/lib/cardDetails";
 import { prisma } from "@/lib/db";
@@ -76,6 +77,9 @@ export default async function CardDetailPage({
             <SpeakButton text={card.term} lang={card.language} size={26} className="ml-4 align-middle" />
             {emoji && <span className="ml-4 align-middle text-4xl">{emoji}</span>}
           </h1>
+          {details.reading && (
+            <p className="mt-2 text-lg font-medium text-muted">{details.reading}</p>
+          )}
           <p className="mt-4 text-2xl font-medium tracking-tight">
             {card.translation ?? <span className="text-muted/60">no translation yet</span>}
           </p>
@@ -120,7 +124,7 @@ export default async function CardDetailPage({
           </div>
         )}
 
-        {card.wordType === "VERB" && card.deck.language === "es" && (
+        {card.wordType === "VERB" && getLanguageProfile(card.deck.language)?.conjugation.table && (
           <ConjugationPanel cardId={cardId} initialTable={details.conjugationTable} />
         )}
 
@@ -176,7 +180,7 @@ export default async function CardDetailPage({
           Edit card
         </ButtonLink>
         <CardStatusActions cardId={cardId} srs={srs} />
-        {card.wordType !== "GRAMMAR" && (
+        {card.wordType !== "GRAMMAR" && isEnrichable(card.deck.language) && (
           <EnrichButton cardId={cardId} enriched={card.enrichedAt != null} />
         )}
       </div>
