@@ -76,6 +76,12 @@ const ALIAS_TO_FIELD = new Map<string, Field>(
 const normalizeHeader = (h: string) =>
   h.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+/** Match a single header label to a canonical card field (or undefined).
+ *  Shared with the Anki importer so its column mapping reuses these aliases. */
+export function headerToField(raw: string): keyof ImportCard | undefined {
+  return ALIAS_TO_FIELD.get(normalizeHeader(raw));
+}
+
 /* ------------------------------------------------------------------ */
 /* Value coercion                                                      */
 /* ------------------------------------------------------------------ */
