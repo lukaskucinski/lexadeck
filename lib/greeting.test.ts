@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { greetingFor, resolveGreetingLanguage } from "./greeting";
+import { greetingFor, greetingForDate, resolveGreetingLanguage } from "./greeting";
 
 describe("greetingFor", () => {
   it.each([
@@ -29,6 +29,23 @@ describe("greetingFor", () => {
 
   it("is case-insensitive about the language tag", () => {
     expect(greetingFor("JA", 8)).toBe("おはよう");
+  });
+});
+
+describe("greetingForDate", () => {
+  // new Date(y, mo, d, h, m) builds a Date at LOCAL wall-clock time, and
+  // greetingForDate must read that local hour — never a fixed app timezone.
+  it.each([
+    [8, "buenos días"],
+    [11, "buenos días"],
+    [14, "buenas tardes"],
+    [22, "buenas noches"],
+  ])("derives the greeting from the local hour %i", (hour, expected) => {
+    expect(greetingForDate("es", new Date(2026, 5, 14, hour, 30))).toBe(expected);
+  });
+
+  it("passes the language through to greetingFor", () => {
+    expect(greetingForDate("ja", new Date(2026, 5, 14, 8, 0))).toBe("おはよう");
   });
 });
 
