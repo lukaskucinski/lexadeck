@@ -99,15 +99,15 @@ describe("German build", () => {
   };
   const data = getConjugationSpec("de")!.build("schlafen", raw);
 
-  it("shows infinitive + Partizip II headers", () => {
+  it("shows infinitive + past-participle headers in English", () => {
     expect(data.headers).toEqual([
       { label: "Infinitive", value: "schlafen" },
-      { label: "Partizip II", value: "geschlafen" },
+      { label: "Past participle", value: "geschlafen" },
     ]);
   });
-  it("groups Indikativ/Konjunktiv/Imperativ with the right cell counts", () => {
-    expect(data.groups.map((g) => g.mood)).toEqual(["Indikativ", "Konjunktiv", "Imperativ"]);
-    const perfekt = data.groups[0].tenses.find((t) => t.label === "Perfekt")!;
+  it("groups Indicative/Subjunctive/Imperative (English) with the right cell counts", () => {
+    expect(data.groups.map((g) => g.mood)).toEqual(["Indicative", "Subjunctive", "Imperative"]);
+    const perfekt = data.groups[0].tenses.find((t) => t.label.startsWith("Present perfect"))!;
     expect(perfekt.forms[0]).toBe("habe geschlafen");
     const imperativ = data.groups[2].tenses[0];
     expect(imperativ.persons).toEqual(["du", "ihr", "Sie"]);

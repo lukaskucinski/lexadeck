@@ -33,6 +33,7 @@ export default async function NewCardPage({
         allowAddAnother
         cancelHref={`/decks/${deck.id}`}
         enrich={enrich}
+        language={deck.language}
       />
     </div>
   );

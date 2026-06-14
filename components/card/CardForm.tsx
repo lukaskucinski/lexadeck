@@ -3,6 +3,7 @@
 import { Sparkles } from "lucide-react";
 import { useActionState, useRef, useState, useTransition } from "react";
 import type { ActionState } from "@/lib/actions/decks";
+import { getLanguageProfile } from "@/lib/ai/languages";
 import type { EnrichmentPreview } from "@/lib/cardDetails";
 import {
   CardType,
@@ -54,15 +55,19 @@ export function CardForm({
   allowAddAnother = false,
   cancelHref,
   enrich,
+  language = "es",
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   initial?: CardFormValues;
   submitLabel: string;
   allowAddAnother?: boolean;
   cancelHref?: string;
-  /** when set, shows an AI "Auto-fill from term" control (create flow, es decks) */
+  /** when set, shows an AI "Auto-fill from term" control (create flow, enrichable decks) */
   enrich?: (term: string) => Promise<{ preview?: EnrichmentPreview; error?: string }>;
+  /** deck language (ISO code) — drives the target-language field label */
+  language?: string;
 }) {
+  const targetLang = getLanguageProfile(language)?.name ?? language.toUpperCase();
   const [state, formAction, pending] = useActionState(action, {});
   const [wordType, setWordType] = useState(initial.wordType ?? "NOUN");
   const [formKey, setFormKey] = useState(0);
@@ -153,7 +158,7 @@ export function CardForm({
               defaultValue={initial.term ?? ""}
               required
               autoFocus
-              placeholder="fallecer"
+              placeholder="word or phrase"
               className={`${inputCls} type-term text-2xl`}
             />
           </Field>
@@ -172,7 +177,7 @@ export function CardForm({
           <input
             name="translation"
             defaultValue={initial.translation ?? ""}
-            placeholder="to pass away; to die"
+            placeholder="English translation"
             className={`${inputCls} text-lg font-medium`}
           />
         </Field>
@@ -224,11 +229,11 @@ export function CardForm({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2">
-          <Field label="Example (Spanish)" className="sm:border-r">
+          <Field label={`Example (${targetLang})`} className="sm:border-r">
             <input
               name="example"
               defaultValue={initial.example ?? ""}
-              placeholder="El escritor falleció en París."
+              placeholder="example sentence"
               className={`${inputCls} text-sm`}
             />
           </Field>
@@ -236,7 +241,7 @@ export function CardForm({
             <input
               name="exampleEn"
               defaultValue={initial.exampleEn ?? ""}
-              placeholder="The writer passed away in Paris."
+              placeholder="its English translation"
               className={`${inputCls} text-sm`}
             />
           </Field>
@@ -247,7 +252,7 @@ export function CardForm({
             name="conjugation"
             defaultValue={initial.conjugation ?? ""}
             rows={3}
-            placeholder={"fallezco (yo)\nfallece (él/ella)"}
+            placeholder="key conjugated forms"
             className={`${inputCls} resize-y text-sm`}
           />
         </Field>

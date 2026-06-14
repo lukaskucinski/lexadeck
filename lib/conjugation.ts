@@ -320,25 +320,27 @@ const DE_IMPERATIVE = ["du", "ihr", "Sie"];
 const DE_SPEC = genericSpec(
   "de",
   {
+    // English tense labels (German term in parens) — clearer for the English
+    // learner and consistent with the Spanish table's English labels.
     infinitiveLabel: "Infinitive",
-    headers: [{ key: "partizip2", label: "Partizip II" }],
+    headers: [{ key: "partizip2", label: "Past participle" }],
     groups: [
       {
-        mood: "Indikativ",
+        mood: "Indicative",
         tenses: [
-          { key: "praesens", label: "Präsens", persons: DE_PERSONS },
-          { key: "praeteritum", label: "Präteritum", persons: DE_PERSONS },
-          { key: "perfekt", label: "Perfekt", persons: DE_PERSONS },
-          { key: "futur1", label: "Futur I", persons: DE_PERSONS },
+          { key: "praesens", label: "Present (Präsens)", persons: DE_PERSONS },
+          { key: "praeteritum", label: "Simple past (Präteritum)", persons: DE_PERSONS },
+          { key: "perfekt", label: "Present perfect (Perfekt)", persons: DE_PERSONS },
+          { key: "futur1", label: "Future (Futur I)", persons: DE_PERSONS },
         ],
       },
       {
-        mood: "Konjunktiv",
-        tenses: [{ key: "konjunktiv2", label: "Konjunktiv II", persons: DE_PERSONS }],
+        mood: "Subjunctive",
+        tenses: [{ key: "konjunktiv2", label: "Subjunctive II (Konjunktiv II)", persons: DE_PERSONS }],
       },
       {
-        mood: "Imperativ",
-        tenses: [{ key: "imperativ", label: "Imperativ", persons: DE_IMPERATIVE }],
+        mood: "Imperative",
+        tenses: [{ key: "imperativ", label: "Imperative", persons: DE_IMPERATIVE }],
       },
     ],
   },

@@ -2,7 +2,9 @@
 
 import { useActionState } from "react";
 import type { ActionState } from "@/lib/actions/decks";
+import { isEnrichable } from "@/lib/ai/languages";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 const ACCENTS = [
   "blue",
@@ -14,6 +16,21 @@ const ACCENTS = [
   "pink",
   "lavender",
 ] as const;
+
+// Curated picker list; AI-enrichable languages (es/ja/de) are flagged at render.
+const LANGUAGES: { code: string; name: string }[] = [
+  { code: "es", name: "Spanish" },
+  { code: "de", name: "German" },
+  { code: "ja", name: "Japanese" },
+  { code: "en", name: "English" },
+  { code: "fr", name: "French" },
+  { code: "it", name: "Italian" },
+  { code: "pt", name: "Portuguese" },
+  { code: "zh", name: "Chinese" },
+  { code: "ko", name: "Korean" },
+  { code: "ru", name: "Russian" },
+  { code: "ar", name: "Arabic" },
+];
 
 export interface DeckFormValues {
   name?: string;
@@ -33,6 +50,12 @@ export function DeckForm({
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
+  // keep an unusual existing code (edit flow) selectable even if not in the list
+  const current = (initial.language ?? "es").toLowerCase();
+  const options = LANGUAGES.some((l) => l.code === current)
+    ? LANGUAGES
+    : [{ code: current, name: current.toUpperCase() }, ...LANGUAGES];
+
   return (
     <form action={formAction} className="max-w-xl">
       <div className="border-[1.5px] border-line">
@@ -49,14 +72,17 @@ export function DeckForm({
         </label>
 
         <label className="block border-b border-soft px-5 py-4">
-          <span className="label-caps text-muted">Language (ISO code)</span>
-          <input
-            name="language"
-            defaultValue={initial.language ?? "es"}
-            required
-            maxLength={8}
-            className="mt-1.5 block w-24 bg-transparent text-sm font-bold uppercase tracking-[0.14em] outline-none"
-          />
+          <span className="label-caps text-muted">Language</span>
+          <Select name="language" defaultValue={current} className="mt-1.5 w-full max-w-xs">
+            {options.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name} ({l.code}){isEnrichable(l.code) ? " · AI" : ""}
+              </option>
+            ))}
+          </Select>
+          <span className="mt-1.5 block text-[0.7rem] text-muted">
+            “· AI” languages support translation, enrichment, and conjugation.
+          </span>
         </label>
 
         <label className="block border-b border-soft px-5 py-4">

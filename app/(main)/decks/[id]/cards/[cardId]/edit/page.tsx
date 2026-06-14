@@ -29,6 +29,7 @@ export default async function EditCardPage({
         initial={card}
         submitLabel="Save changes"
         cancelHref={`/decks/${id}/cards/${cardId}`}
+        language={card.language}
       />
 
       <div className="mt-12 max-w-2xl border-t-[1.5px] border-line pt-6">
