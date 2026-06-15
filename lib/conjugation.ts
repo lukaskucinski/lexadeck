@@ -5,6 +5,7 @@
  * fixed `haber` paradigm + the past participle, so compounds are always correct
  * regardless of the verb. buildConjugationTable is the pure, unit-tested core.
  */
+import { geminiConjugate } from "./ai/enrichment";
 
 /** Person columns for finite tenses (yo … ellos), 6 entries. */
 export const CONJ_PERSONS = ["yo", "tú", "él/ella/ud.", "nosotros", "vosotros", "ellos/uds."];
@@ -362,4 +363,19 @@ const CONJ_SPECS: Record<string, ConjugationSpec> = { es: ES_SPEC, ja: JA_SPEC, 
 /** The conjugation spec for a language, or null if it has no structured table. */
 export function getConjugationSpec(code: string | null | undefined): ConjugationSpec | null {
   return CONJ_SPECS[(code ?? "").trim().toLowerCase()] ?? null;
+}
+
+/**
+ * Generate a verb's full conjugation table from its term: one AI request shaped
+ * by the language's spec, turned into the display structure by spec.build.
+ * Persists nothing — the card page caches the result, the new-card form carries
+ * it into createCard. Shared by both the cached (card) and card-less (create)
+ * conjugation paths.
+ */
+export async function buildConjugationFromTerm(
+  verb: string,
+  spec: ConjugationSpec,
+): Promise<ConjugationData> {
+  const raw = await geminiConjugate(verb, spec);
+  return spec.build(verb, raw);
 }

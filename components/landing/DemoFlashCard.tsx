@@ -1,8 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
-import { FlashCard } from "@/components/study/FlashCard";
 import type { StudyCard } from "@/lib/study";
+
+// The demo reuses the real study card (and its `motion` flip). Loading it
+// lazily keeps `motion` out of the landing page's initial bundle; the
+// placeholder holds the card's height so nothing shifts when it swaps in.
+const FlashCard = dynamic(
+  () => import("@/components/study/FlashCard").then((m) => m.FlashCard),
+  {
+    ssr: false,
+    loading: () => <div className="min-h-[420px] w-full border-[1.5px] border-line bg-bg" />,
+  },
+);
 
 /**
  * The real study FlashCard as a landing-page set piece: any click toggles
