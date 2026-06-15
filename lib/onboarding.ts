@@ -5,9 +5,22 @@
  * lib/actions/onboarding.ts.
  */
 import { z } from "zod";
+import { CEFR_LEVELS } from "./ai/cefr";
 import { DEFAULT_SUBJECT, isLanguageSubject, SUBJECT_SLUGS } from "./ai/subjects";
 
 export type GateOutcome = "request-access" | "onboarding" | "ok";
+
+/** Optional age buckets captured at onboarding (drives the PR4 walkthrough later). */
+export const AGE_RANGES = [
+  { slug: "under-18", label: "Under 18" },
+  { slug: "18-24", label: "18–24" },
+  { slug: "25-34", label: "25–34" },
+  { slug: "35-49", label: "35–49" },
+  { slug: "50-64", label: "50–64" },
+  { slug: "65-plus", label: "65+" },
+] as const;
+
+export const AGE_RANGE_SLUGS: readonly string[] = AGE_RANGES.map((a) => a.slug);
 
 /**
  * Where a signed-in user should go. The allowlist wins over everything (beta
@@ -23,10 +36,20 @@ export function onboardingGateDecision(input: {
   return "ok";
 }
 
-/** Onboarding form (PR1): a use-case (subject), an optional language, T&C consent. */
+// Empty form values (unselected Select / "not sure") become undefined so the
+// optional enums pass instead of failing on "".
+const optionalEnum = (values: readonly string[]) =>
+  z.preprocess((v) => (v ? v : undefined), z.enum(values as [string, ...string[]]).optional());
+
+/**
+ * Onboarding form: a use-case (subject), an optional language + CEFR level (for
+ * language learners), an optional age range, and required T&C consent.
+ */
 export const onboardingSchema = z.object({
   primarySubject: z.enum(SUBJECT_SLUGS as [string, ...string[]]).default(DEFAULT_SUBJECT),
   primaryLanguage: z.string().trim().optional(),
+  ageRange: optionalEnum(AGE_RANGE_SLUGS),
+  cefrLevel: optionalEnum(CEFR_LEVELS),
   // checkbox: present ("on") only when checked; coerce then require true.
   acceptedTerms: z.preprocess(
     (v) => v === "on" || v === true,
@@ -49,9 +72,20 @@ export function parseOnboarding(raw: Record<string, unknown>) {
 export function profileFromOnboarding(input: {
   primarySubject: string;
   primaryLanguage?: string;
-}): { primarySubject: string; primaryLanguage: string | null } {
-  const primaryLanguage = isLanguageSubject(input.primarySubject)
-    ? (input.primaryLanguage ?? "").trim() || "es"
-    : null;
-  return { primarySubject: input.primarySubject, primaryLanguage };
+  ageRange?: string;
+  cefrLevel?: string;
+}): {
+  primarySubject: string;
+  primaryLanguage: string | null;
+  ageRange: string | null;
+  cefrLevel: string | null;
+} {
+  const isLang = isLanguageSubject(input.primarySubject);
+  return {
+    primarySubject: input.primarySubject,
+    primaryLanguage: isLang ? (input.primaryLanguage ?? "").trim() || "es" : null,
+    ageRange: input.ageRange ?? null,
+    // CEFR only applies to language learning; domain decks never carry it.
+    cefrLevel: isLang ? (input.cefrLevel ?? null) : null,
+  };
 }

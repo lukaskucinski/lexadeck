@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { parseOnboarding, profileFromOnboarding } from "@/lib/onboarding";
 import { upsertProfile } from "@/lib/profile";
+import { createSpanishStarterDeck } from "@/lib/starter/es-starter";
 
 export interface OnboardingState {
   error?: string;
@@ -24,18 +25,31 @@ export async function completeOnboarding(
   const parsed = parseOnboarding({
     primarySubject: formData.get("primarySubject") ?? undefined,
     primaryLanguage: formData.get("primaryLanguage") ?? undefined,
+    ageRange: formData.get("ageRange") ?? undefined,
+    cefrLevel: formData.get("cefrLevel") ?? undefined,
     acceptedTerms: formData.get("acceptedTerms"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { primarySubject, primaryLanguage } = profileFromOnboarding(parsed.data);
+  const { primarySubject, primaryLanguage, ageRange, cefrLevel } = profileFromOnboarding(
+    parsed.data,
+  );
   const now = new Date();
   await upsertProfile(user.id, {
     primarySubject,
     primaryLanguage,
+    ageRange,
+    cefrLevel,
     acceptedTermsAt: now,
     onboardingCompletedAt: now,
   });
+
+  // Optional curated starter — only meaningful for a Spanish language learner.
+  // primaryLanguage === "es" implies the Languages subject (domain decks store null).
+  if (formData.get("starterDeck") === "on" && primaryLanguage === "es") {
+    const deckId = await createSpanishStarterDeck(user.id);
+    redirect(`/decks/${deckId}`);
+  }
 
   redirect("/");
 }

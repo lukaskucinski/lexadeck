@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { completeOnboarding, type OnboardingState } from "@/lib/actions/onboarding";
+import { CEFR_LEVELS } from "@/lib/ai/cefr";
 import { isEnrichable, PICKER_LANGUAGES } from "@/lib/ai/languages";
 import { DEFAULT_SUBJECT, isLanguageSubject, SUBJECT_OPTIONS } from "@/lib/ai/subjects";
+import { AGE_RANGES } from "@/lib/onboarding";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
@@ -20,6 +22,8 @@ export function OnboardingForm({
     {},
   );
   const [subject, setSubject] = useState(initialSubject);
+  const [language, setLanguage] = useState(initialLanguage);
+  const offerStarter = isLanguageSubject(subject) && language === "es";
 
   return (
     <form action={formAction} className="mt-8">
@@ -44,19 +48,65 @@ export function OnboardingForm({
         </label>
 
         {isLanguageSubject(subject) && (
-          <label className="block border-b border-soft px-5 py-4">
-            <span className="label-caps text-muted">Which language?</span>
-            <Select
-              name="primaryLanguage"
-              defaultValue={initialLanguage}
-              className="mt-2 w-full max-w-xs"
-            >
-              {PICKER_LANGUAGES.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.name} ({l.code}){isEnrichable(l.code) ? " · AI" : ""}
-                </option>
-              ))}
-            </Select>
+          <>
+            <label className="block border-b border-soft px-5 py-4">
+              <span className="label-caps text-muted">Which language?</span>
+              <Select
+                name="primaryLanguage"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="mt-2 w-full max-w-xs"
+              >
+                {PICKER_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name} ({l.code}){isEnrichable(l.code) ? " · AI" : ""}
+                  </option>
+                ))}
+              </Select>
+            </label>
+
+            <label className="block border-b border-soft px-5 py-4">
+              <span className="label-caps text-muted">Your level (optional)</span>
+              <Select name="cefrLevel" defaultValue="" className="mt-2 w-full max-w-xs">
+                <option value="">I&apos;m not sure</option>
+                {CEFR_LEVELS.map((lvl) => (
+                  <option key={lvl} value={lvl}>
+                    {lvl}
+                  </option>
+                ))}
+              </Select>
+              <span className="mt-1.5 block text-[0.7rem] text-muted">
+                CEFR band — tunes AI enrichment to your level. Leave it if you don&apos;t know.
+              </span>
+            </label>
+          </>
+        )}
+
+        <label className="block border-b border-soft px-5 py-4">
+          <span className="label-caps text-muted">Age range (optional)</span>
+          <Select name="ageRange" defaultValue="" className="mt-2 w-full max-w-xs">
+            <option value="">Prefer not to say</option>
+            {AGE_RANGES.map((a) => (
+              <option key={a.slug} value={a.slug}>
+                {a.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+
+        {offerStarter && (
+          <label className="flex items-start gap-3 border-b border-soft px-5 py-4">
+            <input
+              type="checkbox"
+              name="starterDeck"
+              defaultChecked
+              className="mt-1 h-4 w-4 shrink-0 accent-coral"
+            />
+            <span className="text-sm leading-relaxed text-muted">
+              Start me off with a{" "}
+              <span className="font-bold text-ink">10-card Spanish starter deck</span> so
+              there&apos;s something to study right away.
+            </span>
           </label>
         )}
 

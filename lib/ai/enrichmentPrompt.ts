@@ -5,6 +5,7 @@
  * output (and behavior) for existing decks is unchanged.
  */
 import { WordType } from "../types";
+import { cefrPromptLevel } from "./cefr";
 import type { EnrichableCard } from "./enrichment";
 import type { LanguageProfile } from "./languages";
 import { getSubjectProfile } from "./subjects";
@@ -45,6 +46,7 @@ export function buildEnrichmentPrompt(
   profile: LanguageProfile,
   cards: EnrichableCard[],
   subject?: string,
+  level?: string | null,
 ): string {
   const cardLines = cards.map((c) =>
     JSON.stringify({
@@ -73,7 +75,7 @@ export function buildEnrichmentPrompt(
     `- "correction": "" in almost all cases. ONLY if the term or its given translation is clearly MISSPELLED — not merely a regional or stylistic variant — return a short ENGLISH note naming the likely intended form, e.g. "'<term>' looks misspelled — did you mean '<intended>'?". Respect valid regional spellings and accents; never flag a correct word.`,
   ].filter((line): line is string => line !== null);
 
-  return `You are helping build ${profile.name}→English flashcards for an adult learner (A2/B1 level).${subjectContext(subject)}
+  return `You are helping build ${profile.name}→English flashcards for an adult learner (${cefrPromptLevel(level)} level).${subjectContext(subject)}
 
 For EACH card below, return one JSON object carrying the same "id", with these fields:
 ${fields.join("\n")}

@@ -258,6 +258,10 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
   if (!profile) {
     return { error: "AI enrichment isn't available for this deck's language yet" };
   }
+  const learner = await prisma.profile.findUnique({
+    where: { userId: user.id },
+    select: { cefrLevel: true },
+  });
 
   try {
     let translation = card.translation;
@@ -279,6 +283,7 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
       ],
       profile,
       card.deck.subject,
+      learner?.cefrLevel ?? null,
     );
     if (!raw) return { error: "The AI returned no enrichment for this card" };
 
@@ -319,6 +324,7 @@ export async function previewEnrichment(
       [{ id: "preview", term: cleaned, translation, wordType: null, gender: null, notes: null }],
       gate.profile,
       gate.subject,
+      gate.cefrLevel,
     );
     if (!raw) return { error: "The AI returned no suggestion" };
     const item = normalizeEnrichment(raw, gate.profile);
@@ -426,9 +432,10 @@ const NON_GRAMMAR = { not: "GRAMMAR" } as const;
  * Resolve a user-owned deck and its enrichment LanguageProfile. Only languages
  * with a tuned profile (es/ja/de) are enrichable; everything else is rejected.
  */
-async function requireEnrichableDeck(
-  deckId: string,
-): Promise<{ userId: string; profile: LanguageProfile; subject: string } | { error: string }> {
+async function requireEnrichableDeck(deckId: string): Promise<
+  | { userId: string; profile: LanguageProfile; subject: string; cefrLevel: string | null }
+  | { error: string }
+> {
   const user = await requireUser();
   const deck = await prisma.deck.findFirst({
     where: { id: deckId, userId: user.id },
@@ -439,7 +446,12 @@ async function requireEnrichableDeck(
   if (!profile) {
     return { error: "AI enrichment isn't available for this deck's language yet" };
   }
-  return { userId: user.id, profile, subject: deck.subject };
+  // The deck owner's CEFR level tunes the enrichment prompt (default A2/B1).
+  const learner = await prisma.profile.findUnique({
+    where: { userId: user.id },
+    select: { cefrLevel: true },
+  });
+  return { userId: user.id, profile, subject: deck.subject, cefrLevel: learner?.cefrLevel ?? null };
 }
 
 /** Prisma where-fragment for a deck's non-grammar cards in one enrich bucket. */
@@ -560,6 +572,7 @@ export async function enrichCards(
       })),
       gate.profile,
       gate.subject,
+      gate.cefrLevel,
     );
     const byId = new Map(raws.map((r) => [String(r.id), r]));
 

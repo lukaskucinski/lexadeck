@@ -26,10 +26,14 @@ describe("onboardingGateDecision", () => {
 });
 
 describe("profileFromOnboarding", () => {
-  it("keeps the picked language for a Languages use-case", () => {
-    expect(profileFromOnboarding({ primarySubject: "languages", primaryLanguage: "ja" })).toEqual({
+  it("keeps the picked language + CEFR for a Languages use-case", () => {
+    expect(
+      profileFromOnboarding({ primarySubject: "languages", primaryLanguage: "ja", cefrLevel: "B2" }),
+    ).toEqual({
       primarySubject: "languages",
       primaryLanguage: "ja",
+      ageRange: null,
+      cefrLevel: "B2",
     });
   });
 
@@ -37,18 +41,35 @@ describe("profileFromOnboarding", () => {
     expect(profileFromOnboarding({ primarySubject: "languages", primaryLanguage: "" })).toEqual({
       primarySubject: "languages",
       primaryLanguage: "es",
+      ageRange: null,
+      cefrLevel: null,
     });
     expect(profileFromOnboarding({ primarySubject: "languages" })).toEqual({
       primarySubject: "languages",
       primaryLanguage: "es",
+      ageRange: null,
+      cefrLevel: null,
     });
   });
 
-  it("stores null language for a domain use-case (ignores any picked language)", () => {
-    expect(profileFromOnboarding({ primarySubject: "medicine", primaryLanguage: "es" })).toEqual({
+  it("stores null language + null CEFR for a domain use-case (CEFR never applies)", () => {
+    expect(
+      profileFromOnboarding({ primarySubject: "medicine", primaryLanguage: "es", cefrLevel: "C1" }),
+    ).toEqual({
       primarySubject: "medicine",
       primaryLanguage: null,
+      ageRange: null,
+      cefrLevel: null,
     });
+  });
+
+  it("carries the age range through for any subject", () => {
+    expect(
+      profileFromOnboarding({ primarySubject: "law", ageRange: "25-34" }).ageRange,
+    ).toBe("25-34");
+    expect(
+      profileFromOnboarding({ primarySubject: "languages", ageRange: "65-plus" }).ageRange,
+    ).toBe("65-plus");
   });
 });
 
@@ -70,5 +91,23 @@ describe("parseOnboarding", () => {
   it("rejects an unknown subject", () => {
     const r = parseOnboarding({ primarySubject: "astrology", acceptedTerms: "on" });
     expect(r.success).toBe(false);
+  });
+
+  it("treats empty age/CEFR selections as undefined (both skippable)", () => {
+    const r = parseOnboarding({ acceptedTerms: "on", ageRange: "", cefrLevel: "" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.ageRange).toBeUndefined();
+      expect(r.data.cefrLevel).toBeUndefined();
+    }
+  });
+
+  it("accepts valid age + CEFR selections", () => {
+    const r = parseOnboarding({ acceptedTerms: "on", ageRange: "25-34", cefrLevel: "B1" });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.ageRange).toBe("25-34");
+      expect(r.data.cefrLevel).toBe("B1");
+    }
   });
 });
