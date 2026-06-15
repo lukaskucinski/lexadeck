@@ -78,7 +78,7 @@ export function InstallButton() {
       <button
         type="button"
         onClick={install}
-        className="pressable label-caps border-[1.5px] border-line bg-ink px-3 py-1.5 text-bg transition-colors hover:bg-coral active:bg-coral"
+        className="pressable label-caps border-[1.5px] border-line bg-ink px-3 py-1.5 text-bg hover:bg-coral"
       >
         Install app
       </button>

@@ -3,13 +3,14 @@ import type { ComponentProps, ReactNode } from "react";
 
 type Variant = "primary" | "outline" | "ghost" | "danger";
 
-// `active:` mirrors `hover:` so a touch press shows the colour invert immediately
-// (touch has no hover); the `.pressable` class adds the subtle press-scale.
+// `.pressable` (in BASE) gives a calm opacity dim on press. Hover colour-inverts
+// are desktop-only (Tailwind's `hover:` doesn't fire on touch) so a tap no longer
+// flashes a colour.
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-ink text-bg hover:bg-coral hover:text-bg active:bg-coral active:text-bg",
-  outline: "border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg active:bg-ink active:text-bg",
-  ghost: "text-muted hover:text-ink active:text-ink",
-  danger: "border-[1.5px] border-coral text-coral hover:bg-coral hover:text-bg active:bg-coral active:text-bg",
+  primary: "bg-ink text-bg hover:bg-coral hover:text-bg",
+  outline: "border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg",
+  ghost: "text-muted hover:text-ink",
+  danger: "border-[1.5px] border-coral text-coral hover:bg-coral hover:text-bg",
 };
 
 const BASE =

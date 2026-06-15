@@ -151,22 +151,18 @@ summary {
   touch-action: manipulation;
 }
 
-/* opt-in press affordance: a brief, subtle squish on :active. On-brand for the
-   flat Swiss language (no shadow to collapse); pairs with the hover/active color
-   inverts on buttons so a tap is acknowledged immediately. Reduced-motion safe. */
+/* opt-in press affordance: a calm opacity dim on :active — clearly "pressed"
+   without a colour flash (the colour-invert version read as flashing on tap).
+   Opacity-only, so nothing to gate for reduced-motion. Hover colour-inverts
+   stay desktop-only via Tailwind's `hover:` variant. */
 .pressable {
   user-select: none;
   -webkit-user-select: none;
   transition:
-    transform 100ms ease-out,
-    background-color 100ms ease-out,
-    color 100ms ease-out;
+    opacity 120ms ease-out,
+    background-color 120ms ease-out,
+    color 120ms ease-out;
 }
 .pressable:active {
-  transform: scale(0.97);
-}
-@media (prefers-reduced-motion: reduce) {
-  .pressable:active {
-    transform: none;
-  }
+  opacity: 0.6;
 }

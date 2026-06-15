@@ -30,7 +30,7 @@ export function ReviewButtons({
             tap();
             onRate(rating);
           }}
-          className={`flex h-16 flex-col items-center justify-center gap-0.5 text-[0.8rem] font-extrabold tracking-[0.04em] uppercase transition-colors hover:bg-soft active:bg-soft disabled:opacity-40 ${
+          className={`pressable flex h-16 flex-col items-center justify-center gap-0.5 text-[0.8rem] font-extrabold tracking-[0.04em] uppercase hover:bg-soft disabled:opacity-40 ${
             i > 0 ? "border-l border-line" : ""
           }`}
         >

@@ -39,7 +39,7 @@ export function BottomNav() {
             key={href}
             href={href}
             className={`pressable flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
-              active ? "text-ink" : "text-muted active:text-ink"
+              active ? "text-ink" : "text-muted"
             }`}
           >
             <Icon size={20} strokeWidth={active ? 2.4 : 2} />
