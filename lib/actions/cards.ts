@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
   type EnrichmentItem,
-  geminiConjugate,
   geminiEnrich,
   normalizeEnrichment,
   translateBatch,
@@ -19,6 +18,7 @@ import {
   withoutCorrection,
 } from "@/lib/cardDetails";
 import {
+  buildConjugationFromTerm,
   type ConjugationData,
   type ConjugationSpec,
   getConjugationSpec,
@@ -342,6 +342,35 @@ export async function previewEnrichment(
 }
 
 /**
+ * Conjugation for the new-card form: build a verb's full table from a typed term
+ * that has no card yet, for review before saving. Persists nothing — the form
+ * carries the table in its hidden `details` field and createCard saves it. Same
+ * language gate as the card page's "Show all tenses" (a ConjugationSpec + the
+ * profile's table capability — es/ja/de today).
+ */
+export async function previewConjugation(
+  deckId: string,
+  term: string,
+): Promise<{ table?: ConjugationData; error?: string }> {
+  const gate = await requireEnrichableDeck(deckId);
+  if ("error" in gate) return { error: gate.error };
+  const spec = getConjugationSpec(gate.profile.code);
+  if (!gate.profile.conjugation.table || !spec) {
+    return { error: "Conjugation isn't available for this language yet" };
+  }
+
+  const cleaned = term.trim();
+  if (!cleaned) return { error: "Enter a term first" };
+  if (cleaned.length > 200) return { error: "Term is too long" };
+
+  try {
+    return { table: await buildConjugationFromTerm(cleaned, spec) };
+  } catch (err) {
+    return { error: (err as Error).message.slice(0, 200) };
+  }
+}
+
+/**
  * Generate + cache the full conjugation table for one verb card record, using
  * the language's ConjugationSpec (spec.build turns the AI's raw JSON into the
  * display table; Spanish derives its compound tenses there). A cached table is
@@ -353,8 +382,7 @@ async function buildAndCacheConjugation(
 ): Promise<ConjugationData> {
   const existing = getCardDetails(card.details);
   if (existing.conjugationTable) return existing.conjugationTable;
-  const raw = await geminiConjugate(card.term, spec);
-  const table = spec.build(card.term, raw);
+  const table = await buildConjugationFromTerm(card.term, spec);
   await prisma.card.update({
     where: { id: card.id },
     data: { details: { ...existing, conjugationTable: table } },

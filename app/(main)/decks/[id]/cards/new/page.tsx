@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { CardForm } from "@/components/card/CardForm";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { createCard, previewEnrichment } from "@/lib/actions/cards";
+import { createCard, previewConjugation, previewEnrichment } from "@/lib/actions/cards";
 import { isEnrichable } from "@/lib/ai/languages";
 import { requireUser } from "@/lib/auth";
+import { getConjugationSpec } from "@/lib/conjugation";
 import { prisma } from "@/lib/db";
 import { WordType } from "@/lib/types";
 
@@ -22,6 +23,10 @@ export default async function NewCardPage({
   const action = createCard.bind(null, deck.id);
   // Auto-fill is available for any tuned language (es/ja/de)
   const enrich = isEnrichable(deck.language) ? previewEnrichment.bind(null, deck.id) : undefined;
+  // "Generate all tenses" — only for languages with a structured conjugation table
+  const conjugate = getConjugationSpec(deck.language)
+    ? previewConjugation.bind(null, deck.id)
+    : undefined;
 
   return (
     <div>
@@ -33,6 +38,7 @@ export default async function NewCardPage({
         allowAddAnother
         cancelHref={`/decks/${deck.id}`}
         enrich={enrich}
+        conjugate={conjugate}
         language={deck.language}
       />
     </div>

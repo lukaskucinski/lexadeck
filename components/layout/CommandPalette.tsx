@@ -9,7 +9,7 @@ import {
   LibraryBig,
   Search,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { searchCards, type SearchHit } from "@/lib/actions/search";
 import { sanitizeEmoji } from "@/lib/emoji";
 
@@ -34,9 +34,14 @@ const NAV: NavEntry[] = [
   { type: "nav", label: "Progress", href: "/progress", icon: ChartNoAxesColumn },
 ];
 
-export function CommandPalette() {
+/**
+ * The search overlay itself. Controlled by CommandPaletteLoader, which owns the
+ * Cmd/Ctrl+K shortcut and only mounts this (and thus downloads its chunk —
+ * lucide icons + the search action) once the palette is first opened. Rendered
+ * only while open; unmounting on close resets the query.
+ */
+export function CommandPalette({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [index, setIndex] = useState(0);
@@ -47,48 +52,25 @@ export function CommandPalette() {
     : NAV;
   const entries: Entry[] = [...navMatches, ...hits.map((hit) => ({ type: "card" as const, hit }))];
 
-  const close = useCallback(() => {
-    setOpen(false);
-    setQuery("");
-    setHits([]);
-    setIndex(0);
-  }, []);
-
-  // global shortcut
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen((v) => !v);
-      }
-      if (e.key === "Escape") close();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [close]);
-
   // debounced card search
   useEffect(() => {
-    if (!open) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setHits(query.trim().length >= 2 ? await searchCards(query) : []);
       setIndex(0);
     }, 200);
-  }, [query, open]);
+  }, [query]);
 
   function go(entry: Entry) {
-    close();
+    onClose();
     if (entry.type === "nav") router.push(entry.href);
     else router.push(`/decks/${entry.hit.deckId}/cards/${entry.hit.id}`);
   }
 
-  if (!open) return null;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[14vh]"
-      onClick={close}
+      onClick={onClose}
     >
       <div
         className="w-full max-w-lg border-[1.5px] border-line bg-bg shadow-[8px_8px_0_0_var(--c-soft)]"

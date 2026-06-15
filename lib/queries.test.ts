@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 // lib/queries.ts doesn't instantiate a Prisma client
 vi.mock("./db", () => ({ prisma: {} }));
 
-import { buildCardWhere, parseCardViewParams } from "./queries";
+import { assembleDeckSummaries, buildCardWhere, parseCardViewParams } from "./queries";
 
 describe("parseCardViewParams facet parsing", () => {
   it("absent params mean no constraint (undefined)", () => {
@@ -82,5 +82,43 @@ describe("buildCardWhere", () => {
   it("hasTranslation true/false map to null checks", () => {
     expect(buildCardWhere({ hasTranslation: true }).translation).toEqual({ not: null });
     expect(buildCardWhere({ hasTranslation: false }).translation).toBeNull();
+  });
+});
+
+describe("assembleDeckSummaries", () => {
+  const decks = [
+    { id: "d1", name: "Español", language: "es", subject: "languages", description: null, accentColor: null },
+    { id: "d2", name: "日本語", language: "ja", subject: "medicine", description: "test", accentColor: "#FF6B5C" },
+  ];
+
+  it("joins per-deck counts + last-studied onto each deck", () => {
+    const counts = [{ deckId: "d1", cardCount: 1011, readyCount: 12, masteredCount: 40 }];
+    const studied = new Map<string, Date | null>([["d1", new Date("2026-06-01T00:00:00.000Z")]]);
+
+    const out = assembleDeckSummaries(decks, counts, studied);
+
+    expect(out[0]).toEqual({
+      id: "d1", name: "Español", language: "es", subject: "languages", description: null, accentColor: null,
+      cardCount: 1011, readyCount: 12, masteredCount: 40,
+      lastStudied: new Date("2026-06-01T00:00:00.000Z"),
+    });
+  });
+
+  it("defaults a deck with no cards / no session to zeros + null", () => {
+    const out = assembleDeckSummaries(decks, [], new Map());
+    expect(out[1]).toEqual({
+      id: "d2", name: "日本語", language: "ja", subject: "medicine", description: "test", accentColor: "#FF6B5C",
+      cardCount: 0, readyCount: 0, masteredCount: 0, lastStudied: null,
+    });
+  });
+
+  it("preserves deck order regardless of count-row order", () => {
+    const counts = [
+      { deckId: "d2", cardCount: 5, readyCount: 0, masteredCount: 0 },
+      { deckId: "d1", cardCount: 9, readyCount: 0, masteredCount: 0 },
+    ];
+    const out = assembleDeckSummaries(decks, counts, new Map());
+    expect(out.map((d) => d.id)).toEqual(["d1", "d2"]);
+    expect(out[0].cardCount).toBe(9);
   });
 });
