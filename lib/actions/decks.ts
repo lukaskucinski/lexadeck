@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
+import { DEFAULT_SUBJECT, effectiveDeckLanguage, SUBJECT_SLUGS } from "@/lib/ai/subjects";
 import { prisma } from "@/lib/db";
 
 export interface ActionState {
@@ -24,6 +25,7 @@ const ACCENTS = [
 const deckSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(80),
   language: z.string().trim().min(2).max(8),
+  subject: z.enum(SUBJECT_SLUGS as [string, ...string[]]).default(DEFAULT_SUBJECT),
   description: z
     .string()
     .trim()
@@ -33,9 +35,13 @@ const deckSchema = z.object({
 });
 
 function deckDataFromForm(formData: FormData) {
+  const subject = String(formData.get("subject") ?? DEFAULT_SUBJECT);
+  // Only Languages decks pick a target language; domain subjects store English.
+  const language = effectiveDeckLanguage(subject, formData.get("language") as string | null);
   return deckSchema.safeParse({
     name: formData.get("name"),
-    language: formData.get("language") ?? "es",
+    language,
+    subject,
     description: formData.get("description") ?? "",
     accentColor: formData.get("accentColor") ?? "coral",
   });

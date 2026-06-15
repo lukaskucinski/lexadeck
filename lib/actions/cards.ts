@@ -248,7 +248,7 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
   const user = await requireUser();
   const card = await prisma.card.findFirst({
     where: { id: cardId, deck: { userId: user.id } },
-    include: { deck: { select: { language: true } } },
+    include: { deck: { select: { language: true, subject: true } } },
   });
   if (!card) return { error: "Card not found" };
   if (card.wordType === "GRAMMAR") {
@@ -278,6 +278,7 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
         },
       ],
       profile,
+      card.deck.subject,
     );
     if (!raw) return { error: "The AI returned no enrichment for this card" };
 
@@ -317,6 +318,7 @@ export async function previewEnrichment(
     const [raw] = await geminiEnrich(
       [{ id: "preview", term: cleaned, translation, wordType: null, gender: null, notes: null }],
       gate.profile,
+      gate.subject,
     );
     if (!raw) return { error: "The AI returned no suggestion" };
     const item = normalizeEnrichment(raw, gate.profile);
@@ -426,18 +428,18 @@ const NON_GRAMMAR = { not: "GRAMMAR" } as const;
  */
 async function requireEnrichableDeck(
   deckId: string,
-): Promise<{ userId: string; profile: LanguageProfile } | { error: string }> {
+): Promise<{ userId: string; profile: LanguageProfile; subject: string } | { error: string }> {
   const user = await requireUser();
   const deck = await prisma.deck.findFirst({
     where: { id: deckId, userId: user.id },
-    select: { language: true },
+    select: { language: true, subject: true },
   });
   if (!deck) return { error: "Deck not found" };
   const profile = getLanguageProfile(deck.language);
   if (!profile) {
     return { error: "AI enrichment isn't available for this deck's language yet" };
   }
-  return { userId: user.id, profile };
+  return { userId: user.id, profile, subject: deck.subject };
 }
 
 /** Prisma where-fragment for a deck's non-grammar cards in one enrich bucket. */
@@ -557,6 +559,7 @@ export async function enrichCards(
         notes: c.notes,
       })),
       gate.profile,
+      gate.subject,
     );
     const byId = new Map(raws.map((r) => [String(r.id), r]));
 

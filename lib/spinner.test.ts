@@ -48,8 +48,25 @@ describe("reel timing", () => {
 });
 
 describe("resolveSubjectWord", () => {
-  it("returns language for language decks", () => {
-    expect(resolveSubjectWord([{ language: "es" }, { language: "ja" }])).toBe("language");
+  const day = (n: number) => new Date(2026, 0, n);
+  const decks = [
+    { id: "a", subject: "languages", lastStudied: day(1) },
+    { id: "b", subject: "medicine", lastStudied: day(3) },
+    { id: "c", subject: "coding", lastStudied: null },
+  ];
+
+  it("uses the tagline word of the last-opened deck's subject", () => {
+    expect(resolveSubjectWord(decks, "c")).toBe("coding");
+  });
+
+  it("falls back to the most recently studied deck's subject word", () => {
+    expect(resolveSubjectWord(decks, undefined)).toBe("medicine");
+  });
+
+  it("keeps the language word for an all-languages deck list", () => {
+    expect(
+      resolveSubjectWord([{ id: "a", subject: "languages", lastStudied: day(1) }], "a"),
+    ).toBe("language");
   });
 
   it("defaults to language with no decks", () => {

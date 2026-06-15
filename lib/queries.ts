@@ -128,6 +128,7 @@ export interface DeckSummary {
   id: string;
   name: string;
   language: string;
+  subject: string;
   description: string | null;
   accentColor: string | null;
   cardCount: number;
@@ -149,6 +150,7 @@ interface DeckMeta {
   id: string;
   name: string;
   language: string;
+  subject: string;
   description: string | null;
   accentColor: string | null;
 }
@@ -170,6 +172,7 @@ export function assembleDeckSummaries(
       id: deck.id,
       name: deck.name,
       language: deck.language,
+      subject: deck.subject,
       description: deck.description,
       accentColor: deck.accentColor,
       cardCount: c?.cardCount ?? 0,

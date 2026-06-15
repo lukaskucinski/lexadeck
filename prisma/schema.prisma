@@ -12,6 +12,7 @@ model Deck {
   userId      String // Supabase Auth user uuid — cards/reviews scope through the deck
   name        String
   language    String   @default("es") // ISO 639-1
+  subject     String   @default("languages") // SubjectProfile slug (lib/ai/subjects.ts)
   description String?
   accentColor String? // semantic token name, e.g. "coral"
   createdAt   DateTime @default(now())

@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { ActionState } from "@/lib/actions/decks";
 import { isEnrichable } from "@/lib/ai/languages";
+import { DEFAULT_SUBJECT, isLanguageSubject, SUBJECT_OPTIONS } from "@/lib/ai/subjects";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
@@ -35,6 +36,7 @@ const LANGUAGES: { code: string; name: string }[] = [
 export interface DeckFormValues {
   name?: string;
   language?: string;
+  subject?: string | null;
   description?: string | null;
   accentColor?: string | null;
 }
@@ -49,6 +51,9 @@ export function DeckForm({
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
+
+  // Subject is the primary axis; the Language picker only exists under Languages.
+  const [subject, setSubject] = useState(initial.subject ?? DEFAULT_SUBJECT);
 
   // keep an unusual existing code (edit flow) selectable even if not in the list
   const current = (initial.language ?? "es").toLowerCase();
@@ -72,18 +77,39 @@ export function DeckForm({
         </label>
 
         <label className="block border-b border-soft px-5 py-4">
-          <span className="label-caps text-muted">Language</span>
-          <Select name="language" defaultValue={current} className="mt-1.5 w-full max-w-xs">
-            {options.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.name} ({l.code}){isEnrichable(l.code) ? " · AI" : ""}
+          <span className="label-caps text-muted">Subject</span>
+          <Select
+            name="subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="mt-1.5 w-full max-w-xs"
+          >
+            {SUBJECT_OPTIONS.map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.label}
               </option>
             ))}
           </Select>
           <span className="mt-1.5 block text-[0.7rem] text-muted">
-            “· AI” languages support translation, enrichment, and conjugation.
+            Languages decks teach a language; other subjects are term → definition decks.
           </span>
         </label>
+
+        {isLanguageSubject(subject) && (
+          <label className="block border-b border-soft px-5 py-4">
+            <span className="label-caps text-muted">Language</span>
+            <Select name="language" defaultValue={current} className="mt-1.5 w-full max-w-xs">
+              {options.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.name} ({l.code}){isEnrichable(l.code) ? " · AI" : ""}
+                </option>
+              ))}
+            </Select>
+            <span className="mt-1.5 block text-[0.7rem] text-muted">
+              “· AI” languages support translation, enrichment, and conjugation.
+            </span>
+          </label>
+        )}
 
         <label className="block border-b border-soft px-5 py-4">
           <span className="label-caps text-muted">Description</span>

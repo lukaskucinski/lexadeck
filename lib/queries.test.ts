@@ -87,8 +87,8 @@ describe("buildCardWhere", () => {
 
 describe("assembleDeckSummaries", () => {
   const decks = [
-    { id: "d1", name: "Español", language: "es", description: null, accentColor: null },
-    { id: "d2", name: "日本語", language: "ja", description: "test", accentColor: "#FF6B5C" },
+    { id: "d1", name: "Español", language: "es", subject: "languages", description: null, accentColor: null },
+    { id: "d2", name: "日本語", language: "ja", subject: "medicine", description: "test", accentColor: "#FF6B5C" },
   ];
 
   it("joins per-deck counts + last-studied onto each deck", () => {
@@ -98,7 +98,7 @@ describe("assembleDeckSummaries", () => {
     const out = assembleDeckSummaries(decks, counts, studied);
 
     expect(out[0]).toEqual({
-      id: "d1", name: "Español", language: "es", description: null, accentColor: null,
+      id: "d1", name: "Español", language: "es", subject: "languages", description: null, accentColor: null,
       cardCount: 1011, readyCount: 12, masteredCount: 40,
       lastStudied: new Date("2026-06-01T00:00:00.000Z"),
     });
@@ -107,7 +107,7 @@ describe("assembleDeckSummaries", () => {
   it("defaults a deck with no cards / no session to zeros + null", () => {
     const out = assembleDeckSummaries(decks, [], new Map());
     expect(out[1]).toEqual({
-      id: "d2", name: "日本語", language: "ja", description: "test", accentColor: "#FF6B5C",
+      id: "d2", name: "日本語", language: "ja", subject: "medicine", description: "test", accentColor: "#FF6B5C",
       cardCount: 0, readyCount: 0, masteredCount: 0, lastStudied: null,
     });
   });

@@ -1,8 +1,10 @@
 /**
  * Use-case words for the "flashcards for <word>" tagline. The public landing
- * page cycles through all of them; the signed-in dashboard shows one static
- * subject word resolved from the user's decks.
+ * page cycles through all of them; the signed-in dashboard shows one
+ * subject word resolved from the user's active deck.
  */
+import { pickActiveDeck } from "./decks";
+import { subjectTaglineWord } from "./ai/subjects";
 
 // After the opener, ascending popularity: the reel decelerates, so words
 // later in the pass get a little more show time.
@@ -33,16 +35,20 @@ export function reelStrip(words: readonly string[], settleOn: string): string[] 
 }
 
 export interface SubjectDeck {
-  language: string;
+  id: string;
+  subject: string;
+  lastStudied: Date | null;
 }
 
 /**
- * Dashboard tagline word ("flashcard <word> learning") for the most recently
- * opened deck. Every deck today is a language deck, so this is constant — it
- * becomes a real dispatch the day decks grow a subject/domain field (see the
- * "Domain-aware decks" Aspirational board card).
+ * Dashboard tagline word ("flashcard <word> learning") for the active deck
+ * (last-opened → most recently studied → first). Resolves the deck's subject to
+ * its tagline word; falls back to "language" when the user has no decks.
  */
-export function resolveSubjectWord(decks: readonly SubjectDeck[]): string {
-  void decks;
-  return "language";
+export function resolveSubjectWord(
+  decks: readonly SubjectDeck[],
+  lastDeckId?: string,
+): string {
+  const deck = pickActiveDeck(decks, lastDeckId);
+  return deck ? subjectTaglineWord(deck.subject) : "language";
 }
