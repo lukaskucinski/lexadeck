@@ -4,10 +4,11 @@ import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Heatmap } from "@/components/ui/Heatmap";
 import { DeckTile } from "@/components/deck/DeckTile";
+import { Greeting } from "@/components/dashboard/Greeting";
 import { requireUser } from "@/lib/auth";
 import { LAST_DECK_COOKIE } from "@/lib/decks";
 import { sanitizeEmoji } from "@/lib/emoji";
-import { greetingFor, resolveGreetingLanguage } from "@/lib/greeting";
+import { resolveGreetingLanguage } from "@/lib/greeting";
 import { resolveSubjectWord } from "@/lib/spinner";
 import { getDeckSummaries } from "@/lib/queries";
 import { APP_TZ, getReviewActivity } from "@/lib/stats";
@@ -55,13 +56,11 @@ export default async function DashboardPage() {
           lexadeck<span className="text-coral">.</span> — flashcard{" "}
           {resolveSubjectWord(decks)} learning
         </p>
-        {/* slightly looser than type-display's 0.95 so the greeting's descenders
-            (e.g. "guten") don't crowd the name on the second line */}
-        <h1 className="type-display text-5xl md:text-7xl" style={{ lineHeight: 1.1 }}>
-          {greetingFor(greetingLang, currentHour())},
-          <br />
-          <span className="text-coral">{user.displayName.toLowerCase()}.</span>
-        </h1>
+        <Greeting
+          greetingLang={greetingLang}
+          displayName={user.displayName}
+          serverHour={currentHour()}
+        />
         <p className="mt-5 max-w-[44ch] font-medium text-muted">
           {totalReady > 0 ? (
             <>

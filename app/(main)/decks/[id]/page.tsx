@@ -8,6 +8,7 @@ import { FilterPanel } from "@/components/card/FilterPanel";
 import { FlashCardPreview } from "@/components/card/FlashCardPreview";
 import { Pagination } from "@/components/card/Pagination";
 import { SearchBar } from "@/components/card/SearchBar";
+import { SortControl } from "@/components/card/SortControl";
 import { DeckSelectionBar } from "@/components/deck/DeckSelectionBar";
 import { EnrichPanel } from "@/components/deck/EnrichPanel";
 import { KanbanBoard } from "@/components/deck/KanbanBoard";
@@ -74,7 +75,7 @@ export default async function DeckDetailPage({
   if (vp.view === "kanban") {
     const cards = await prisma.card.findMany({
       where,
-      orderBy: [{ due: "asc" }, { term: "asc" }],
+      orderBy: cardOrderBy(vp.sort, vp.dir),
       select: CARD_SELECT,
     });
     const rows = cards.map((c) => toCardRow(c, now));
@@ -183,6 +184,7 @@ export default async function DeckDetailPage({
         </div>
         <div className="flex items-center gap-3">
           <SearchBar />
+          <SortControl />
           <FilterPanel />
         </div>
       </div>

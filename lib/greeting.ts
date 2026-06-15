@@ -19,6 +19,16 @@ export function greetingFor(language: string, hour: number): string {
   return set[2];
 }
 
+/**
+ * Greeting derived from the *local* hour of `now`. Used client-side so the
+ * time of day reflects the user's own clock — not a fixed server timezone
+ * (board bug: "buenos días" shown at 10:30 PM because the server keyed off
+ * APP_TZ = America/Chicago).
+ */
+export function greetingForDate(language: string, now: Date = new Date()): string {
+  return greetingFor(language, now.getHours());
+}
+
 export interface GreetingDeck {
   id: string;
   language: string;
