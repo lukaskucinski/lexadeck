@@ -54,7 +54,7 @@ export default async function DashboardPage() {
       <header className="border-b-[3px] border-line pb-8">
         <p className="label-caps mb-4 text-muted">
           lexadeck<span className="text-coral">.</span> — flashcard{" "}
-          {resolveSubjectWord(decks)} learning
+          {resolveSubjectWord(decks, cookieStore.get(LAST_DECK_COOKIE)?.value)} learning
         </p>
         <Greeting
           greetingLang={greetingLang}

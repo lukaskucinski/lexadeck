@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import type { ActionState } from "@/lib/actions/decks";
 import { isEnrichable } from "@/lib/ai/languages";
+import { DEFAULT_SUBJECT, SUBJECT_OPTIONS } from "@/lib/ai/subjects";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
@@ -35,6 +36,7 @@ const LANGUAGES: { code: string; name: string }[] = [
 export interface DeckFormValues {
   name?: string;
   language?: string;
+  subject?: string | null;
   description?: string | null;
   accentColor?: string | null;
 }
@@ -82,6 +84,24 @@ export function DeckForm({
           </Select>
           <span className="mt-1.5 block text-[0.7rem] text-muted">
             “· AI” languages support translation, enrichment, and conjugation.
+          </span>
+        </label>
+
+        <label className="block border-b border-soft px-5 py-4">
+          <span className="label-caps text-muted">Subject</span>
+          <Select
+            name="subject"
+            defaultValue={initial.subject ?? DEFAULT_SUBJECT}
+            className="mt-1.5 w-full max-w-xs"
+          >
+            {SUBJECT_OPTIONS.map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+          <span className="mt-1.5 block text-[0.7rem] text-muted">
+            Tailors the dashboard tagline and AI enrichment to the deck’s use case.
           </span>
         </label>
 

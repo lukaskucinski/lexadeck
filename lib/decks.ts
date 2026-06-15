@@ -17,3 +17,23 @@ export function resolveDeckLanding(
   if (lastVisited && deckIds.includes(lastVisited)) return lastVisited;
   return null;
 }
+
+/**
+ * The deck the user is currently working in: last-opened (ld-last-deck cookie) →
+ * most recently studied → first deck → undefined (no decks). Shared by the
+ * dashboard greeting (language) and the tagline (subject).
+ */
+export function pickActiveDeck<T extends { id: string; lastStudied: Date | null }>(
+  decks: readonly T[],
+  lastDeckId: string | undefined,
+): T | undefined {
+  const lastOpened = lastDeckId ? decks.find((d) => d.id === lastDeckId) : undefined;
+  if (lastOpened) return lastOpened;
+
+  const lastStudied = decks
+    .filter((d) => d.lastStudied != null)
+    .sort((a, b) => b.lastStudied!.getTime() - a.lastStudied!.getTime())[0];
+  if (lastStudied) return lastStudied;
+
+  return decks[0];
+}
