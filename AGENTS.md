@@ -23,6 +23,9 @@ Supabase account June 2026 — the MCP must be authenticated against that accoun
   the top supersedes conflicting v0.1 sections below it** (design language, SRS, API style).
 - `README.md` — setup, env vars, scripts.
 - [Design System](.claude/docs/DESIGN_SYSTEM.md) — Swiss Typographic rules for all UI work.
+- [AI Enrichment](.claude/docs/AI_ENRICHMENT.md) — language-aware enrichment (es/ja/de), providers, prompts.
+- [Import](.claude/docs/IMPORT.md) — CSV/TSV + Anki `.txt`/`.apkg` import pipeline.
+- [Card Views](.claude/docs/CARD_VIEWS.md) — deck/library filter, sort, and view URL-param model.
 
 ## TickTick Board (dev workflow)
 - Kanban project `6a28a16c8f083ab70be5322c` via the TickTick MCP; columns:
@@ -48,10 +51,12 @@ Supabase account June 2026 — the MCP must be authenticated against that accoun
   `E2E_EMAIL`/`E2E_PASSWORD` from `.env`; user creation/rotation is
   `scripts/create-users.ts` (credentials land in gitignored `.env.credentials`,
   never in chat/logs).
-- **AI providers**: Azure Translator F0 = translation; Gemini = enrichment —
-  in-app ("AI enrich" on the card page; keys are Vercel env vars since June 9)
-  and bulk local scripts. Prompts are Spanish-tuned: don't enrich non-`es`
-  decks (e.g. Ari's Japanese deck) until that's generalized.
+- **AI providers**: Azure Translator F0 (DeepL fallback) = translation; Gemini =
+  enrichment — in-app ("AI enrich" on the card page; keys are Vercel env vars) and
+  bulk local scripts. Enrichment is **language-aware** via a profile registry
+  (`lib/ai/languages.ts`): `es` / `ja` / `de` are enrichable today and
+  `isEnrichable()` gates every UI/action; structured conjugation tables are still
+  Spanish-only. See [AI Enrichment](.claude/docs/AI_ENRICHMENT.md).
 
 ## Stack Gotchas
 - **Next.js pinned to 16.2.8** — npm `latest` tag is the 16.3 preview, which has
@@ -67,8 +72,15 @@ Supabase account June 2026 — the MCP must be authenticated against that accoun
   derived-state-in-render pattern or `useSyncExternalStore`), no component
   definitions inside render, no ref reads during render.
 - **Schema changes**: `npm run db:push` (no migration files by design).
-- **Stats timezone**: review-day grouping and streaks use `America/Chicago`
-  (`APP_TZ` in `lib/stats.ts`).
+- **Stats timezone**: review-day grouping and streaks use a fixed `America/Chicago`
+  (`APP_TZ` in `lib/stats.ts`) for all users. The dashboard **greeting** is the
+  deliberate exception — a client component keyed off the browser's local time
+  (`greetingForDate`, `components/dashboard/Greeting.tsx`), so the time-of-day
+  greeting matches the user's own clock, not `APP_TZ`.
+- **`.apkg` parsing deps**: `sql.js` (WASM), `fflate`, `fzstd` load **lazily,
+  client-side**, only when an Anki `.apkg` is picked. sql.js's wasm is self-hosted
+  at `public/sql-wasm.wasm` and bundles cleanly via its `browser` export (no Node
+  polyfills). See [Import](.claude/docs/IMPORT.md).
 - **Gemini free tier**: this account caps `gemini-2.5-flash` at ~20 req/day; for
   bulk runs use `GEMINI_MODEL=gemini-2.5-flash-lite GEMINI_BATCH=40`. Enrichment
   is resumable (processes `enrichedAt IS NULL`; translations `translation IS NULL`).
@@ -86,7 +98,8 @@ Supabase account June 2026 — the MCP must be authenticated against that accoun
   UI → smoke test), then flesh it out — don't build layers in isolation.
 
 ## Testing
-- `npm test` — vitest units (srs, import parsers, filters, speech, greeting…).
+- `npm test` — vitest units (srs, import/anki parsers, filters, sort, enrichment
+  prompts, language profiles, speech, greeting…).
 - `npx tsx scripts/study-smoke.ts` — Playwright e2e (server on port 3457; signs
   in with `E2E_EMAIL`/`E2E_PASSWORD`); asserts review rows, FSRS mutation,
   Again re-queue.
@@ -100,8 +113,9 @@ Supabase account June 2026 — the MCP must be authenticated against that accoun
 - Cards were imported once from the Notion export (CSV + per-page MD files) in
   `Downloads/38bec63f-…-Part-1/`; join key is (term from MD H1, Stage) — MD
   filenames are truncated, never use them. Import scripts are one-off; the in-app
-  CSV/TSV import wizard lives at `/decks/import` (`lib/import/deckCsv.ts` +
-  `lib/actions/import.ts`; template at `public/lexadeck-import-template.csv`).
+  import wizard (`/decks/import`) accepts CSV/TSV, Anki `.txt`, and Anki `.apkg` —
+  all normalized to one canonical CSV the server action (`lib/actions/import.ts`)
+  validates via `parseDeckCsv`. See [Import](.claude/docs/IMPORT.md).
 - Notion MD parsing lesson: use `[ \t]` not `\s` in line-anchored regexes — `\s`
   matches newlines and slurps the next line on empty fields.
 - Grammar Rules cards (`wordType: GRAMMAR`, ~172) intentionally have no
