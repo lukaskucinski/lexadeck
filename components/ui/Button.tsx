@@ -3,15 +3,17 @@ import type { ComponentProps, ReactNode } from "react";
 
 type Variant = "primary" | "outline" | "ghost" | "danger";
 
+// `active:` mirrors `hover:` so a touch press shows the colour invert immediately
+// (touch has no hover); the `.pressable` class adds the subtle press-scale.
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-ink text-bg hover:bg-coral hover:text-bg",
-  outline: "border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg",
-  ghost: "text-muted hover:text-ink",
-  danger: "border-[1.5px] border-coral text-coral hover:bg-coral hover:text-bg",
+  primary: "bg-ink text-bg hover:bg-coral hover:text-bg active:bg-coral active:text-bg",
+  outline: "border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg active:bg-ink active:text-bg",
+  ghost: "text-muted hover:text-ink active:text-ink",
+  danger: "border-[1.5px] border-coral text-coral hover:bg-coral hover:text-bg active:bg-coral active:text-bg",
 };
 
 const BASE =
-  "inline-flex h-10 items-center justify-center gap-2 px-4 text-[0.78rem] font-extrabold tracking-[0.08em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+  "pressable inline-flex h-10 items-center justify-center gap-2 px-4 text-[0.78rem] font-extrabold tracking-[0.08em] uppercase disabled:cursor-not-allowed disabled:opacity-40";
 
 export function Button({
   variant = "primary",

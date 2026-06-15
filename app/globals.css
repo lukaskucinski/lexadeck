@@ -139,3 +139,34 @@ select option {
 .perspective-1200 {
   perspective: 1200px;
 }
+
+/* ---- tactile feedback (mobile press states) -------------- */
+/* kill the grey tap-flash + the 300ms double-tap delay on every control */
+button,
+a,
+[role="button"],
+label,
+summary {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* opt-in press affordance: a brief, subtle squish on :active. On-brand for the
+   flat Swiss language (no shadow to collapse); pairs with the hover/active color
+   inverts on buttons so a tap is acknowledged immediately. Reduced-motion safe. */
+.pressable {
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    transform 100ms ease-out,
+    background-color 100ms ease-out,
+    color 100ms ease-out;
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pressable:active {
+    transform: none;
+  }
+}
