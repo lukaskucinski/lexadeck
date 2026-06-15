@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
+import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -17,6 +18,9 @@ export const metadata: Metadata = {
   description:
     "Flashcards for anything — FSRS spaced repetition, AI-enriched cards, typographic design.",
   manifest: "/manifest.webmanifest",
+  // iOS has no install prompt and ignores the manifest's display mode; this gives
+  // an installed home-screen launch a standalone, branded status bar.
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "LexaDeck" },
   openGraph: {
     title: "LexaDeck",
     description:
@@ -61,7 +65,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: themeScript }}
         />
       </head>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        <ServiceWorkerRegistrar />
+      </body>
     </html>
   );
 }

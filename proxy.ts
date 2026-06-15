@@ -44,8 +44,10 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except the login page, Next internals, static assets, and
-    // the social-share images (link-preview scrapers are always signed out)
-    "/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|opengraph-image|twitter-image|lexadeck-import-template.csv).*)",
+    // Everything except the login page, Next internals, static assets, the
+    // social-share images (link-preview scrapers are always signed out), the
+    // service worker, and the apple-touch-icon — the SW must register and iOS
+    // must fetch the icon even when signed out, so these can't 302 to /login.
+    "/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|opengraph-image|twitter-image|apple-icon|sw.js|lexadeck-import-template.csv).*)",
   ],
 };
