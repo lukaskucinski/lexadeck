@@ -2,6 +2,7 @@
  * Dashboard greeting in the language of the deck the user actually works in
  * (board feedback: Ari's Japanese profile was greeted in Spanish).
  */
+import { pickActiveDeck } from "./decks";
 
 // Stored lowercase to match the others; the dashboard hero is text-transform:
 // lowercase anyway, so German nouns (Morgen/Tag/Abend) render lowercase by design.
@@ -36,20 +37,12 @@ export interface GreetingDeck {
 }
 
 /**
- * The "current" language: last-opened deck (ld-last-deck cookie) →
- * most recently studied deck → first deck → app default (es).
+ * The "current" language: the active deck (last-opened → most recently studied →
+ * first) language, or the app default (es) when there are no decks.
  */
 export function resolveGreetingLanguage(
   decks: readonly GreetingDeck[],
   lastDeckId: string | undefined,
 ): string {
-  const lastOpened = lastDeckId && decks.find((d) => d.id === lastDeckId);
-  if (lastOpened) return lastOpened.language;
-
-  const lastStudied = decks
-    .filter((d) => d.lastStudied != null)
-    .sort((a, b) => b.lastStudied!.getTime() - a.lastStudied!.getTime())[0];
-  if (lastStudied) return lastStudied.language;
-
-  return decks[0]?.language ?? "es";
+  return pickActiveDeck(decks, lastDeckId)?.language ?? "es";
 }

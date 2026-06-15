@@ -28,9 +28,14 @@ import { getLanguageProfile, type LanguageProfile } from "../lib/ai/languages";
 import { detailsFromEnrichment } from "../lib/cardDetails";
 import { prisma } from "../lib/db";
 
-/** Group cards by their deck language, keeping only tuned (enrichable) languages. */
+/**
+ * Group cards into enrichable buckets, dropping untuned languages. Buckets are
+ * keyed by language by default (translation); the Gemini pass keys by
+ * language+subject so each bucket's prompt carries one subject context.
+ */
 function groupEnrichable<T extends { deck: { language: string } }>(
   cards: T[],
+  keyOf: (c: T) => string = (c) => c.deck.language,
 ): { groups: Map<string, T[]>; skipped: number } {
   const groups = new Map<string, T[]>();
   let skipped = 0;
@@ -39,9 +44,10 @@ function groupEnrichable<T extends { deck: { language: string } }>(
       skipped++;
       continue;
     }
-    const list = groups.get(c.deck.language);
+    const k = keyOf(c);
+    const list = groups.get(k);
     if (list) list.push(c);
-    else groups.set(c.deck.language, [c]);
+    else groups.set(k, [c]);
   }
   return { groups, skipped };
 }
@@ -115,17 +121,21 @@ type GeminiCard = {
   wordType: string;
   gender: string | null;
   notes: string | null;
-  deck: { language: string };
+  deck: { language: string; subject: string };
 };
 
-async function enrichGroup(group: GeminiCard[], profile: LanguageProfile): Promise<void> {
+async function enrichGroup(
+  group: GeminiCard[],
+  profile: LanguageProfile,
+  subject: string,
+): Promise<void> {
   async function enrichWithRetry(batch: GeminiCard[]): Promise<RawEnrichment[]> {
     try {
-      return await geminiEnrich(batch, profile);
+      return await geminiEnrich(batch, profile, subject);
     } catch (err) {
       console.warn(`  transient failure (${(err as Error).message.slice(0, 80)}…) — retrying in 30s`);
       await sleep(GEMINI_RETRY_DELAY_MS);
-      return geminiEnrich(batch, profile);
+      return geminiEnrich(batch, profile, subject);
     }
   }
 
@@ -171,13 +181,16 @@ async function passGemini(): Promise<void> {
       wordType: true,
       gender: true,
       notes: true,
-      deck: { select: { language: true } },
+      deck: { select: { language: true, subject: true } },
     },
     orderBy: { createdAt: "asc" },
     take: Number.isFinite(LIMIT) ? Number(LIMIT) : undefined,
   });
 
-  const { groups, skipped } = groupEnrichable(cards);
+  const { groups, skipped } = groupEnrichable(
+    cards,
+    (c) => `${c.deck.language} ${c.deck.subject}`,
+  );
   const total = cards.length - skipped;
   console.log(
     `Pass 2 (Gemini): ${total} cards to enrich` +
@@ -190,8 +203,9 @@ async function passGemini(): Promise<void> {
     return;
   }
 
-  for (const [lang, group] of groups) {
-    await enrichGroup(group, getLanguageProfile(lang)!);
+  for (const group of groups.values()) {
+    const { language, subject } = group[0].deck;
+    await enrichGroup(group, getLanguageProfile(language)!, subject);
   }
 }
 

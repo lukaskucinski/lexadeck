@@ -128,6 +128,7 @@ export interface DeckSummary {
   id: string;
   name: string;
   language: string;
+  subject: string;
   description: string | null;
   accentColor: string | null;
   cardCount: number;
@@ -170,6 +171,7 @@ export async function getDeckSummaries(
     id: deck.id,
     name: deck.name,
     language: deck.language,
+    subject: deck.subject,
     description: deck.description,
     accentColor: deck.accentColor,
     cardCount: countMap.get(deck.id) ?? 0,

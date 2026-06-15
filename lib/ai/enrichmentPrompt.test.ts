@@ -63,4 +63,25 @@ describe("buildEnrichmentPrompt", () => {
       expect(p).not.toContain('"reading"');
     });
   });
+
+  describe("per-subject context", () => {
+    const es = getLanguageProfile("es")!;
+
+    it("layers the subject context onto the language tuning for a non-language subject", () => {
+      const p = buildEnrichmentPrompt(es, [card], "medicine");
+      expect(p).toContain("Medicine deck");
+      expect(p.toLowerCase()).toContain("clinical");
+      expect(p).toContain("Spanish→English"); // per-language tuning preserved
+    });
+
+    it("is byte-identical to the no-subject prompt for the languages subject", () => {
+      const base = buildEnrichmentPrompt(es, [card]);
+      expect(buildEnrichmentPrompt(es, [card], "languages")).toBe(base);
+    });
+
+    it("is byte-identical for an unknown subject", () => {
+      const base = buildEnrichmentPrompt(es, [card]);
+      expect(buildEnrichmentPrompt(es, [card], "astrology")).toBe(base);
+    });
+  });
 });

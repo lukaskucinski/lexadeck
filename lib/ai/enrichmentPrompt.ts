@@ -7,6 +7,7 @@
 import { WordType } from "../types";
 import type { EnrichableCard } from "./enrichment";
 import type { LanguageProfile } from "./languages";
+import { getSubjectProfile } from "./subjects";
 
 const WORD_TYPES = Object.values(WordType)
   .filter((w) => w !== "GRAMMAR")
@@ -29,10 +30,21 @@ function usagePatternLine(p: LanguageProfile): string {
   return `- "usagePattern": the grammatical frame the term is typically used in${eg}. Use English grammatical labels (write "+ noun", not a target-language label). "" if there is no characteristic pattern.`;
 }
 
+/**
+ * Subject context appended to the preamble. Empty (byte-identical to the
+ * language-only prompt) for the default `languages` subject or an unknown slug.
+ */
+function subjectContext(subject: string | undefined): string {
+  const profile = subject ? getSubjectProfile(subject) : null;
+  if (!profile || !profile.promptContext) return "";
+  return ` These cards come from a ${profile.label} deck. ${profile.promptContext}`;
+}
+
 /** Build the full enrichment prompt (instructions + the cards as JSON lines). */
 export function buildEnrichmentPrompt(
   profile: LanguageProfile,
   cards: EnrichableCard[],
+  subject?: string,
 ): string {
   const cardLines = cards.map((c) =>
     JSON.stringify({
@@ -61,7 +73,7 @@ export function buildEnrichmentPrompt(
     `- "correction": "" in almost all cases. ONLY if the term or its given translation is clearly MISSPELLED — not merely a regional or stylistic variant — return a short ENGLISH note naming the likely intended form, e.g. "'<term>' looks misspelled — did you mean '<intended>'?". Respect valid regional spellings and accents; never flag a correct word.`,
   ].filter((line): line is string => line !== null);
 
-  return `You are helping build ${profile.name}→English flashcards for an adult learner (A2/B1 level).
+  return `You are helping build ${profile.name}→English flashcards for an adult learner (A2/B1 level).${subjectContext(subject)}
 
 For EACH card below, return one JSON object carrying the same "id", with these fields:
 ${fields.join("\n")}
