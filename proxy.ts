@@ -23,12 +23,14 @@ export default async function proxy(request: NextRequest) {
     },
   });
 
-  // also refreshes an expired session — do not remove
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the session JWT LOCALLY when the project uses
+  // asymmetric signing keys — no Supabase round-trip per request, unlike
+  // getUser() — while still refreshing an expired session via the cookie
+  // setAll above (do not remove). Pages/actions still call getUser()
+  // (lib/auth.ts) so protected data is never trusted on the JWT alone.
+  const { data } = await supabase.auth.getClaims();
 
-  if (!user) {
+  if (!data) {
     const { pathname } = request.nextUrl;
     // first contact: the root URL shows the public landing page, not a login wall
     if (pathname === "/") {

@@ -4,7 +4,7 @@ import { EnrichDemo } from "@/components/landing/EnrichDemo";
 import { Reveal } from "@/components/landing/Reveal";
 import { TrackDemo } from "@/components/landing/TrackDemo";
 import { ButtonLink } from "@/components/ui/Button";
-import { WordSpinner } from "@/components/ui/WordSpinner";
+import { WordSpinnerLazy } from "@/components/ui/WordSpinnerLazy";
 import { getUser } from "@/lib/auth";
 import { DEMO_CARD } from "@/lib/landing-demo";
 import { SPINNER_WORDS } from "@/lib/spinner";
@@ -62,7 +62,7 @@ export default async function WelcomePage() {
             for{" "}
             <br className="lg:hidden" />
             <span className="whitespace-nowrap text-coral">
-              <WordSpinner words={SPINNER_WORDS} settleOn="anything" />
+              <WordSpinnerLazy words={SPINNER_WORDS} settleOn="anything" />
               {/* breathing room — the g's ink and the period abut at this tracking */}
               <span className="ml-[0.04em]">.</span>
             </span>

@@ -1,33 +1,36 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-import type { ReactNode } from "react";
+import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 
-/**
- * Scroll-reveal wrapper for the landing demo sections: a short rise-and-fade
- * the first time the block scrolls into view. Static for reduced-motion users.
- */
-export function Reveal({
-  children,
-  delay = 0,
-  className,
-}: {
+interface RevealProps {
   children: ReactNode;
   delay?: number;
   className?: string;
-}) {
-  const reduced = useReducedMotion();
-  if (reduced) return <div className={className}>{children}</div>;
+}
 
+/**
+ * Scroll-reveal wrapper for the landing demo sections. Renders its children
+ * statically first (so the below-the-fold demos are server-rendered and
+ * `motion` stays out of the initial bundle), then lazy-imports the animated
+ * RevealMotion after hydration to play the rise-and-fade on scroll.
+ */
+export function Reveal({ children, delay, className }: RevealProps) {
+  const [Motion, setMotion] = useState<ComponentType<RevealProps> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    import("./RevealMotion").then((m) => {
+      if (active) setMotion(() => m.RevealMotion);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!Motion) return <div className={className}>{children}</div>;
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "0px 0px -80px 0px" }}
-      transition={{ duration: 0.55, delay, ease: "easeOut" }}
-    >
+    <Motion delay={delay} className={className}>
       {children}
-    </motion.div>
+    </Motion>
   );
 }

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "analyze": "cross-env ANALYZE=true next build --webpack",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "import:notion": "tsx scripts/import-notion.ts",
@@ -37,12 +38,14 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sql.js": "^1.4.11",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "^16.2.8",
