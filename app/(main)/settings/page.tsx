@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { DeleteAccount } from "@/components/settings/DeleteAccount";
 import { StudyExcludeChips } from "@/components/settings/StudyExcludeChips";
 import { SoundToggle } from "@/components/study/SoundToggle";
 import { Button } from "@/components/ui/Button";
@@ -182,6 +183,12 @@ export default async function SettingsPage() {
           <Row label="Export" hint="CSV/JSON export planned">
             <StaticValue>planned</StaticValue>
           </Row>
+        </Section>
+
+        <Section title="Danger zone">
+          <div className="px-5 py-4">
+            <DeleteAccount email={user.email} />
+          </div>
         </Section>
       </div>
     </div>
