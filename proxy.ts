@@ -44,8 +44,10 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except the login page, Next internals, static assets, and
-    // the social-share images (link-preview scrapers are always signed out)
-    "/((?!login|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|opengraph-image|twitter-image|lexadeck-import-template.csv).*)",
+    // Everything except the public auth surfaces (login/signup/request-access/
+    // terms), the OAuth callback handler (must run to exchange the code, not be
+    // redirected to /login), Next internals, static assets, and the social-share
+    // images (link-preview scrapers are always signed out)
+    "/((?!login|signup|request-access|terms|auth/callback|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|opengraph-image|twitter-image|lexadeck-import-template.csv).*)",
   ],
 };
