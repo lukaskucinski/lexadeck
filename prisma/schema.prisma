@@ -104,3 +104,30 @@ model Session {
 
   reviews Review[]
 }
+
+// Per-user onboarding/tailoring captured at signup. Keyed by the Supabase Auth
+// uid (same scoping key as Deck.userId). Absent row OR null onboardingCompletedAt
+// => the onboarding gate sends the user to /onboarding. primarySubject is a
+// SubjectProfile slug (lib/ai/subjects.ts); cefrLevel is A1..C2 (lib/ai/cefr.ts).
+model Profile {
+  id                    String    @id @default(cuid())
+  userId                String    @unique // Supabase Auth user uuid
+  ageRange              String? // AgeRange slug (lib/onboarding.ts); null = not given
+  primarySubject        String    @default("languages") // SubjectProfile slug
+  primaryLanguage       String? // ISO 639-1, set only when primarySubject = languages
+  cefrLevel             String? // A1..C2; null = unknown / not a language learner
+  acceptedTermsAt       DateTime? // AI-content disclaimer + T&C consent
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// Beta access allowlist. Sign-in creates the Supabase auth user, but the app gate
+// (requireOnboardedUser) only lets an email through if it appears here. Emails are
+// stored lower-cased; seed via scripts/allowlist.ts.
+model AllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  note      String?
+  createdAt DateTime @default(now())
+}

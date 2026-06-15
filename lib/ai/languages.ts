@@ -122,6 +122,24 @@ const PROFILES: Record<string, LanguageProfile> = { es: ES, ja: JA, de: DE };
 /** Tuned language codes that support enrichment. */
 export const ENRICHABLE_LANGUAGES: readonly string[] = Object.keys(PROFILES);
 
+/**
+ * Curated language picker list shared by the deck form and onboarding. The
+ * AI-enrichable codes (es/ja/de) are flagged at render via isEnrichable, not here.
+ */
+export const PICKER_LANGUAGES: readonly { code: string; name: string }[] = [
+  { code: "es", name: "Spanish" },
+  { code: "de", name: "German" },
+  { code: "ja", name: "Japanese" },
+  { code: "en", name: "English" },
+  { code: "fr", name: "French" },
+  { code: "it", name: "Italian" },
+  { code: "pt", name: "Portuguese" },
+  { code: "zh", name: "Chinese" },
+  { code: "ko", name: "Korean" },
+  { code: "ru", name: "Russian" },
+  { code: "ar", name: "Arabic" },
+];
+
 /** The default profile used when a caller doesn't pass one (keeps Spanish behavior). */
 export const DEFAULT_PROFILE = ES;
 
