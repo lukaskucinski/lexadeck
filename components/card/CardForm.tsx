@@ -4,7 +4,8 @@ import { Sparkles } from "lucide-react";
 import { useActionState, useRef, useState, useTransition } from "react";
 import type { ActionState } from "@/lib/actions/decks";
 import { getLanguageProfile } from "@/lib/ai/languages";
-import type { EnrichmentPreview } from "@/lib/cardDetails";
+import type { CardDetails, EnrichmentPreview } from "@/lib/cardDetails";
+import type { ConjugationData } from "@/lib/conjugation";
 import {
   CardType,
   Gender,
@@ -12,6 +13,7 @@ import {
   WordType,
 } from "@/lib/types";
 import { wordTypeVar } from "@/lib/wordTypeColors";
+import { ConjugationTable } from "@/components/card/ConjugationTable";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
@@ -55,6 +57,7 @@ export function CardForm({
   allowAddAnother = false,
   cancelHref,
   enrich,
+  conjugate,
   language = "es",
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
@@ -64,18 +67,35 @@ export function CardForm({
   cancelHref?: string;
   /** when set, shows an AI "Auto-fill from term" control (create flow, enrichable decks) */
   enrich?: (term: string) => Promise<{ preview?: EnrichmentPreview; error?: string }>;
+  /** when set, shows "Generate all tenses" for verb cards (table-capable languages) */
+  conjugate?: (term: string) => Promise<{ table?: ConjugationData; error?: string }>;
   /** deck language (ISO code) — drives the target-language field label */
   language?: string;
 }) {
-  const targetLang = getLanguageProfile(language)?.name ?? language.toUpperCase();
+  const profile = getLanguageProfile(language);
+  const targetLang = profile?.name ?? language.toUpperCase();
   const [state, formAction, pending] = useActionState(action, {});
   const [wordType, setWordType] = useState(initial.wordType ?? "NOUN");
   const [formKey, setFormKey] = useState(0);
-  const [detailsJson, setDetailsJson] = useState("");
+  const [autofillDetails, setAutofillDetails] = useState<CardDetails | null>(null);
+  const [conjTable, setConjTable] = useState<ConjugationData | null>(null);
+  const [showConj, setShowConj] = useState(false);
   const [correction, setCorrection] = useState<string | null>(null);
   const [autofillError, setAutofillError] = useState<string | null>(null);
+  const [conjError, setConjError] = useState<string | null>(null);
   const [autofilling, startAutofill] = useTransition();
+  const [conjugating, startConjugate] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Only verbs in a table-capable language (es/ja/de) get the conjugation control.
+  const showConjugate = !!conjugate && wordType === "VERB" && !!profile?.conjugation.table;
+  // The hidden detail layer carried to createCard: the AI auto-fill details plus,
+  // for a verb, the generated conjugation table. Empty string ⇒ no detail layer.
+  const mergedDetails: CardDetails = {
+    ...(autofillDetails ?? {}),
+    ...(conjTable && wordType === "VERB" ? { conjugationTable: conjTable } : {}),
+  };
+  const detailsJson = Object.keys(mergedDetails).length ? JSON.stringify(mergedDetails) : "";
 
   function handleAutofill() {
     if (!enrich || !formRef.current) return;
@@ -105,8 +125,23 @@ export function CardForm({
       set("exampleEn", p.exampleEn);
       set("emoji", p.emoji);
       set("conjugation", p.conjugation);
-      setDetailsJson(JSON.stringify(p.details));
+      setAutofillDetails(p.details);
       setCorrection(p.correction || null);
+    });
+  }
+
+  function handleConjugate() {
+    if (!conjugate || !formRef.current) return;
+    const term = String(new FormData(formRef.current).get("term") ?? "").trim();
+    setConjError(null);
+    startConjugate(async () => {
+      const res = await conjugate(term);
+      if (res.error || !res.table) {
+        setConjError(res.error ?? "No conjugation returned");
+        return;
+      }
+      setConjTable(res.table);
+      setShowConj(true);
     });
   }
 
@@ -122,17 +157,22 @@ export function CardForm({
           // "save + add another": remount the form after the action resolves
           setTimeout(() => {
             setFormKey((k) => k + 1);
-            setDetailsJson("");
+            setAutofillDetails(null);
+            setConjTable(null);
+            setShowConj(false);
             setCorrection(null);
             setAutofillError(null);
+            setConjError(null);
           }, 50);
         }
       }}
     >
-      {enrich && (
-        <>
-          <input type="hidden" name="details" value={detailsJson} readOnly />
-          <div className="mb-3 flex flex-wrap items-center gap-3">
+      {(enrich || conjugate) && (
+        <input type="hidden" name="details" value={detailsJson} readOnly />
+      )}
+      {(enrich || showConjugate) && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          {enrich && (
             <Button
               type="button"
               variant="outline"
@@ -143,12 +183,39 @@ export function CardForm({
               <Sparkles size={14} />
               {autofilling ? "Auto-filling…" : "Auto-fill from term"}
             </Button>
-            {autofillError && (
-              <span className="text-sm font-bold text-coral">{autofillError}</span>
-            )}
-            {correction && <span className="text-sm font-medium text-coral">{correction}</span>}
-          </div>
-        </>
+          )}
+          {showConjugate && !conjTable && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={conjugating}
+              title="Use AI to generate the full conjugation table — saved with the card"
+              onClick={handleConjugate}
+            >
+              <Sparkles size={14} />
+              {conjugating ? "Conjugating…" : "Generate all tenses"}
+            </Button>
+          )}
+          {autofillError && (
+            <span className="text-sm font-bold text-coral">{autofillError}</span>
+          )}
+          {conjError && <span className="text-sm font-bold text-coral">{conjError}</span>}
+          {correction && <span className="text-sm font-medium text-coral">{correction}</span>}
+          {showConjugate && conjTable && (
+            <button
+              type="button"
+              onClick={() => setShowConj((v) => !v)}
+              className="label-caps text-muted hover:text-ink"
+            >
+              ✓ all tenses ready — {showConj ? "hide" : "preview"}
+            </button>
+          )}
+        </div>
+      )}
+      {showConjugate && conjTable && showConj && (
+        <div className="mb-4 border-[1.5px] border-line px-5 py-4">
+          <ConjugationTable data={conjTable} />
+        </div>
       )}
       <div className="border-[1.5px] border-line">
         <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr]">

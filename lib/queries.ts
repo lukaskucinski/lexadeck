@@ -136,24 +136,75 @@ export interface DeckSummary {
   lastStudied: Date | null;
 }
 
+/** Per-deck card counts from the single aggregate query below. */
+interface DeckCardCounts {
+  deckId: string;
+  cardCount: number;
+  readyCount: number;
+  masteredCount: number;
+}
+
+/** Deck metadata the dashboard/deck-list needs (subset of the Deck row). */
+interface DeckMeta {
+  id: string;
+  name: string;
+  language: string;
+  description: string | null;
+  accentColor: string | null;
+}
+
+/**
+ * Join deck rows with their per-deck card counts and last-session times into
+ * DeckSummary[]. Pure (no DB) so it's unit-testable; decks with no cards / no
+ * session default to zero counts / null. Order follows `decks`.
+ */
+export function assembleDeckSummaries(
+  decks: DeckMeta[],
+  cardCounts: DeckCardCounts[],
+  lastStudied: Map<string, Date | null>,
+): DeckSummary[] {
+  const byDeck = new Map(cardCounts.map((c) => [c.deckId, c]));
+  return decks.map((deck) => {
+    const c = byDeck.get(deck.id);
+    return {
+      id: deck.id,
+      name: deck.name,
+      language: deck.language,
+      description: deck.description,
+      accentColor: deck.accentColor,
+      cardCount: c?.cardCount ?? 0,
+      readyCount: c?.readyCount ?? 0,
+      masteredCount: c?.masteredCount ?? 0,
+      lastStudied: lastStudied.get(deck.id) ?? null,
+    };
+  });
+}
+
 export async function getDeckSummaries(
   userId: string,
   now: Date = new Date(),
 ): Promise<DeckSummary[]> {
-  const owned = { deck: { userId } };
-  const [decks, counts, ready, mastered, lastSessions] = await Promise.all([
+  const [decks, cardCounts, lastSessions] = await Promise.all([
     prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
-    prisma.card.groupBy({ by: ["deckId"], where: owned, _count: { _all: true } }),
-    prisma.card.groupBy({
-      by: ["deckId"],
-      where: { ...owned, due: { lte: now }, masteredAt: null },
-      _count: { _all: true },
-    }),
-    prisma.card.groupBy({
-      by: ["deckId"],
-      where: { ...owned, AND: [srsStateWhere("mastered", now)] },
-      _count: { _all: true },
-    }),
+    // One pass over Card computes total / ready / mastered per deck via FILTER
+    // aggregates — replaces three separate groupBy round-trips. The WHERE clauses
+    // mirror the old Prisma queries exactly (ready: due≤now & not mastered;
+    // mastered: manual flag OR FSRS stability — see srsStateWhere("mastered")).
+    prisma.$queryRaw<DeckCardCounts[]>`
+      SELECT c."deckId" AS "deckId",
+             count(*)::int AS "cardCount",
+             count(*) FILTER (
+               WHERE c.due <= ${now} AND c."masteredAt" IS NULL
+             )::int AS "readyCount",
+             count(*) FILTER (
+               WHERE c."masteredAt" IS NOT NULL
+                  OR (c.state = 2 AND c.due > ${now} AND c.stability >= ${MASTERED_STABILITY_DAYS})
+             )::int AS "masteredCount"
+      FROM "Card" c
+      JOIN "Deck" d ON d.id = c."deckId"
+      WHERE d."userId" = ${userId}
+      GROUP BY c."deckId"
+    `,
     prisma.session.groupBy({
       by: ["deckId"],
       where: { deckId: { not: null }, deck: { userId } },
@@ -161,22 +212,11 @@ export async function getDeckSummaries(
     }),
   ]);
 
-  const countMap = new Map(counts.map((c) => [c.deckId, c._count._all]));
-  const readyMap = new Map(ready.map((c) => [c.deckId, c._count._all]));
-  const masteredMap = new Map(mastered.map((c) => [c.deckId, c._count._all]));
-  const studiedMap = new Map(lastSessions.map((s) => [s.deckId, s._max.startedAt]));
-
-  return decks.map((deck) => ({
-    id: deck.id,
-    name: deck.name,
-    language: deck.language,
-    description: deck.description,
-    accentColor: deck.accentColor,
-    cardCount: countMap.get(deck.id) ?? 0,
-    readyCount: readyMap.get(deck.id) ?? 0,
-    masteredCount: masteredMap.get(deck.id) ?? 0,
-    lastStudied: studiedMap.get(deck.id) ?? null,
-  }));
+  const studiedMap = new Map<string, Date | null>();
+  for (const s of lastSessions) {
+    if (s.deckId) studiedMap.set(s.deckId, s._max.startedAt);
+  }
+  return assembleDeckSummaries(decks, cardCounts, studiedMap);
 }
 
 /* ------------------------------------------------------------------ */
