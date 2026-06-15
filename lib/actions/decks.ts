@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
-import { DEFAULT_SUBJECT, SUBJECT_SLUGS } from "@/lib/ai/subjects";
+import { DEFAULT_SUBJECT, effectiveDeckLanguage, SUBJECT_SLUGS } from "@/lib/ai/subjects";
 import { prisma } from "@/lib/db";
 
 export interface ActionState {
@@ -35,10 +35,13 @@ const deckSchema = z.object({
 });
 
 function deckDataFromForm(formData: FormData) {
+  const subject = String(formData.get("subject") ?? DEFAULT_SUBJECT);
+  // Only Languages decks pick a target language; domain subjects store English.
+  const language = effectiveDeckLanguage(subject, formData.get("language") as string | null);
   return deckSchema.safeParse({
     name: formData.get("name"),
-    language: formData.get("language") ?? "es",
-    subject: formData.get("subject") ?? DEFAULT_SUBJECT,
+    language,
+    subject,
     description: formData.get("description") ?? "",
     accentColor: formData.get("accentColor") ?? "coral",
   });

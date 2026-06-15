@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SUBJECT,
+  effectiveDeckLanguage,
   getSubjectProfile,
   isLanguageSubject,
   SUBJECT_OPTIONS,
@@ -95,5 +96,26 @@ describe("isLanguageSubject", () => {
     expect(isLanguageSubject("LANGUAGES")).toBe(true);
     expect(isLanguageSubject("medicine")).toBe(false);
     expect(isLanguageSubject(null)).toBe(false);
+  });
+});
+
+describe("effectiveDeckLanguage", () => {
+  it("uses the picked language for a Languages deck", () => {
+    expect(effectiveDeckLanguage("languages", "ja")).toBe("ja");
+    expect(effectiveDeckLanguage("languages", "de")).toBe("de");
+  });
+
+  it("falls back to Spanish when a Languages deck has no picked language", () => {
+    expect(effectiveDeckLanguage("languages", null)).toBe("es");
+    expect(effectiveDeckLanguage("languages", "   ")).toBe("es");
+  });
+
+  it("forces English for a domain subject, ignoring any picked language", () => {
+    expect(effectiveDeckLanguage("medicine", "es")).toBe("en");
+    expect(effectiveDeckLanguage("law", null)).toBe("en");
+  });
+
+  it("treats an unknown subject as a domain deck (English)", () => {
+    expect(effectiveDeckLanguage("astrology", "es")).toBe("en");
   });
 });

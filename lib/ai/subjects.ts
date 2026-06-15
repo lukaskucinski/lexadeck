@@ -116,3 +116,16 @@ export function subjectTaglineWord(slug: string | null | undefined): string {
 export function isLanguageSubject(slug: string | null | undefined): boolean {
   return key(slug) === DEFAULT_SUBJECT;
 }
+
+/**
+ * The language a deck is stored with. Only Languages decks carry a chosen
+ * target language; every other (domain) subject is a term→definition deck in
+ * the learner's own language, so it stores English and isn't AI-enrichable yet.
+ */
+export function effectiveDeckLanguage(
+  subject: string | null | undefined,
+  pickedLanguage: string | null | undefined,
+): string {
+  if (!isLanguageSubject(subject)) return "en";
+  return (pickedLanguage ?? "").trim() || "es";
+}
