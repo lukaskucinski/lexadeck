@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getDeckSummaries } from "@/lib/queries";
 import { STABILITY_HINT } from "@/lib/srs";
-import { computeStreak, getReviewActivity, getSRSDistribution } from "@/lib/stats";
+import { computeStreak, getProgressTotals, getReviewActivity, getSRSDistribution } from "@/lib/stats";
 import { SRS_STATE_LABELS } from "@/lib/types";
 import { srsStateVar } from "@/lib/wordTypeColors";
 
@@ -16,13 +16,12 @@ const SEGMENTS = 24;
 export default async function ProgressPage() {
   const user = await requireUser();
   const owned = { deck: { userId: user.id } };
-  const [activity, distribution, decks, totalReviews, totalSessions, difficult, graduates] =
+  const [activity, distribution, decks, totals, difficult, graduates] =
     await Promise.all([
       getReviewActivity(user.id, 370),
       getSRSDistribution(user.id),
       getDeckSummaries(user.id),
-      prisma.review.count({ where: { card: owned } }),
-      prisma.session.count({ where: { endedAt: { not: null }, deck: { userId: user.id } } }),
+      getProgressTotals(user.id),
       prisma.card.findMany({
         where: { ...owned, reps: { gt: 0 } },
         orderBy: { difficulty: "desc" },
@@ -49,8 +48,8 @@ export default async function ProgressPage() {
         {(
           [
             [streak, streak === 1 ? "day streak" : "day streak"],
-            [totalReviews, "total reviews"],
-            [totalSessions, "sessions"],
+            [totals.totalReviews, "total reviews"],
+            [totals.totalSessions, "sessions"],
             [totalCards, "cards"],
           ] as const
         ).map(([n, label], i) => (

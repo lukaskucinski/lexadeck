@@ -137,89 +137,86 @@ export interface DeckSummary {
   lastStudied: Date | null;
 }
 
-/** Per-deck card counts from the single aggregate query below. */
-interface DeckCardCounts {
-  deckId: string;
-  cardCount: number;
-  readyCount: number;
-  masteredCount: number;
-}
-
-/** Deck metadata the dashboard/deck-list needs (subset of the Deck row). */
-interface DeckMeta {
+/** Raw row shape returned by the single deck-summary aggregate query. */
+interface DeckSummaryRow {
   id: string;
   name: string;
   language: string;
   subject: string;
   description: string | null;
   accentColor: string | null;
+  cardCount: number;
+  readyCount: number;
+  masteredCount: number;
+  lastStudied: Date | null;
 }
 
 /**
- * Join deck rows with their per-deck card counts and last-session times into
- * DeckSummary[]. Pure (no DB) so it's unit-testable; decks with no cards / no
- * session default to zero counts / null. Order follows `decks`.
+ * Coerce aggregate rows to DeckSummary[]. Pure (no DB) so it's unit-testable.
+ * The `::int` casts already yield JS numbers, but pg can hand back bigints/strings
+ * for aggregate columns — Number() is a defensive normalisation.
  */
-export function assembleDeckSummaries(
-  decks: DeckMeta[],
-  cardCounts: DeckCardCounts[],
-  lastStudied: Map<string, Date | null>,
-): DeckSummary[] {
-  const byDeck = new Map(cardCounts.map((c) => [c.deckId, c]));
-  return decks.map((deck) => {
-    const c = byDeck.get(deck.id);
-    return {
-      id: deck.id,
-      name: deck.name,
-      language: deck.language,
-      subject: deck.subject,
-      description: deck.description,
-      accentColor: deck.accentColor,
-      cardCount: c?.cardCount ?? 0,
-      readyCount: c?.readyCount ?? 0,
-      masteredCount: c?.masteredCount ?? 0,
-      lastStudied: lastStudied.get(deck.id) ?? null,
-    };
-  });
+export function mapDeckSummaryRows(rows: DeckSummaryRow[]): DeckSummary[] {
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    language: r.language,
+    subject: r.subject,
+    description: r.description,
+    accentColor: r.accentColor,
+    cardCount: Number(r.cardCount),
+    readyCount: Number(r.readyCount),
+    masteredCount: Number(r.masteredCount),
+    lastStudied: r.lastStudied,
+  }));
 }
 
+/**
+ * One round-trip: deck metadata LEFT-JOINed to per-deck card-count FILTER
+ * aggregates and the max session start. Replaces the old 3-query Promise.all
+ * (findMany + count aggregate + session.groupBy) so the dashboard/deck-list/
+ * progress pages open one connection here instead of three on a cold start.
+ *
+ * FILTER predicates are preserved verbatim from the prior aggregate:
+ *   readyCount    = due ≤ now AND not mastered (any state — "reviewable now")
+ *   masteredCount = manual flag OR FSRS stability (see srsStateWhere("mastered"))
+ * COALESCE defaults decks with no cards to 0; the LEFT JOIN leaves never-studied
+ * decks with a null lastStudied. Order matches the old `orderBy: createdAt asc`.
+ */
 export async function getDeckSummaries(
   userId: string,
   now: Date = new Date(),
 ): Promise<DeckSummary[]> {
-  const [decks, cardCounts, lastSessions] = await Promise.all([
-    prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
-    // One pass over Card computes total / ready / mastered per deck via FILTER
-    // aggregates — replaces three separate groupBy round-trips. The WHERE clauses
-    // mirror the old Prisma queries exactly (ready: due≤now & not mastered;
-    // mastered: manual flag OR FSRS stability — see srsStateWhere("mastered")).
-    prisma.$queryRaw<DeckCardCounts[]>`
-      SELECT c."deckId" AS "deckId",
-             count(*)::int AS "cardCount",
+  const rows = await prisma.$queryRaw<DeckSummaryRow[]>`
+    SELECT d.id, d.name, d.language, d.subject, d.description, d."accentColor",
+           COALESCE(cc."cardCount", 0)::int     AS "cardCount",
+           COALESCE(cc."readyCount", 0)::int    AS "readyCount",
+           COALESCE(cc."masteredCount", 0)::int AS "masteredCount",
+           ls."lastStudied"                     AS "lastStudied"
+    FROM "Deck" d
+    LEFT JOIN (
+      SELECT c."deckId",
+             count(*) AS "cardCount",
              count(*) FILTER (
                WHERE c.due <= ${now} AND c."masteredAt" IS NULL
-             )::int AS "readyCount",
+             ) AS "readyCount",
              count(*) FILTER (
                WHERE c."masteredAt" IS NOT NULL
                   OR (c.state = 2 AND c.due > ${now} AND c.stability >= ${MASTERED_STABILITY_DAYS})
-             )::int AS "masteredCount"
+             ) AS "masteredCount"
       FROM "Card" c
-      JOIN "Deck" d ON d.id = c."deckId"
-      WHERE d."userId" = ${userId}
       GROUP BY c."deckId"
-    `,
-    prisma.session.groupBy({
-      by: ["deckId"],
-      where: { deckId: { not: null }, deck: { userId } },
-      _max: { startedAt: true },
-    }),
-  ]);
-
-  const studiedMap = new Map<string, Date | null>();
-  for (const s of lastSessions) {
-    if (s.deckId) studiedMap.set(s.deckId, s._max.startedAt);
-  }
-  return assembleDeckSummaries(decks, cardCounts, studiedMap);
+    ) cc ON cc."deckId" = d.id
+    LEFT JOIN (
+      SELECT s."deckId", max(s."startedAt") AS "lastStudied"
+      FROM "Session" s
+      WHERE s."deckId" IS NOT NULL
+      GROUP BY s."deckId"
+    ) ls ON ls."deckId" = d.id
+    WHERE d."userId" = ${userId}
+    ORDER BY d."createdAt" ASC
+  `;
+  return mapDeckSummaryRows(rows);
 }
 
 /* ------------------------------------------------------------------ */

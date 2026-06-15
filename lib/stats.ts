@@ -1,5 +1,6 @@
+import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "./db";
-import { srsStateWhere } from "./queries";
+import { MASTERED_STABILITY_DAYS } from "./srs";
 import type { SRSState } from "./types";
 import type { DayCount } from "@/components/ui/Heatmap";
 
@@ -50,22 +51,68 @@ export interface SRSDistribution {
   count: number;
 }
 
+/** One row of FILTER counts; keys mirror the SRSState union. */
+type SRSDistRow = Record<SRSState, number>;
+
+const SRS_STATE_ORDER: SRSState[] = ["new", "learning", "due", "scheduled", "mastered"];
+
+/**
+ * One round-trip replacing five `card.count` calls: per-state `count(*) FILTER`
+ * columns whose predicates mirror `srsStateWhere` exactly (new/learning/due/
+ * scheduled require `masteredAt IS NULL`; mastered = manual flag OR FSRS stability).
+ * An aggregate without GROUP BY always returns exactly one row (all-zero for an
+ * empty deck). The optional `deckId` narrows via a composed `Prisma.sql` fragment.
+ */
 export async function getSRSDistribution(
   userId: string,
   deckId?: string,
 ): Promise<SRSDistribution[]> {
   const now = new Date();
-  const states: SRSState[] = ["new", "learning", "due", "scheduled", "mastered"];
-  const counts = await Promise.all(
-    states.map((state) =>
-      prisma.card.count({
-        where: {
-          deck: { userId },
-          ...(deckId ? { deckId } : {}),
-          ...srsStateWhere(state, now),
-        },
-      }),
-    ),
-  );
-  return states.map((state, i) => ({ state, count: counts[i] }));
+  const deckFilter = deckId ? Prisma.sql`AND c."deckId" = ${deckId}` : Prisma.empty;
+  const [row] = await prisma.$queryRaw<SRSDistRow[]>`
+    SELECT
+      count(*) FILTER (WHERE c."masteredAt" IS NULL AND c.state = 0)::int AS "new",
+      count(*) FILTER (WHERE c."masteredAt" IS NULL AND c.state IN (1, 3))::int AS "learning",
+      count(*) FILTER (WHERE c."masteredAt" IS NULL AND c.state = 2 AND c.due <= ${now})::int AS "due",
+      count(*) FILTER (
+        WHERE c."masteredAt" IS NULL AND c.state = 2
+          AND c.due > ${now} AND c.stability < ${MASTERED_STABILITY_DAYS}
+      )::int AS "scheduled",
+      count(*) FILTER (
+        WHERE c."masteredAt" IS NOT NULL
+           OR (c.state = 2 AND c.due > ${now} AND c.stability >= ${MASTERED_STABILITY_DAYS})
+      )::int AS "mastered"
+    FROM "Card" c
+    JOIN "Deck" d ON d.id = c."deckId"
+    WHERE d."userId" = ${userId} ${deckFilter}
+  `;
+  return SRS_STATE_ORDER.map((state) => ({ state, count: Number(row?.[state] ?? 0) }));
+}
+
+export interface ProgressTotals {
+  totalReviews: number;
+  totalSessions: number;
+}
+
+/**
+ * The progress page's two scalar counts (lifetime reviews + completed sessions)
+ * in one round-trip instead of two `count` calls. Predicates mirror the old
+ * Prisma filters: reviews scoped to the user's cards; sessions to the user's
+ * decks with `endedAt IS NOT NULL` (a finished session).
+ */
+export async function getProgressTotals(userId: string): Promise<ProgressTotals> {
+  const [row] = await prisma.$queryRaw<ProgressTotals[]>`
+    SELECT
+      (SELECT count(*) FROM "Review" r
+         JOIN "Card" c ON c.id = r."cardId"
+         JOIN "Deck" d ON d.id = c."deckId"
+        WHERE d."userId" = ${userId})::int AS "totalReviews",
+      (SELECT count(*) FROM "Session" s
+         JOIN "Deck" d ON d.id = s."deckId"
+        WHERE d."userId" = ${userId} AND s."endedAt" IS NOT NULL)::int AS "totalSessions"
+  `;
+  return {
+    totalReviews: Number(row?.totalReviews ?? 0),
+    totalSessions: Number(row?.totalSessions ?? 0),
+  };
 }
