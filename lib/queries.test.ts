@@ -1,10 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // buildCardWhere/parseCardViewParams are pure; stub the db so importing
-// lib/queries.ts doesn't instantiate a Prisma client
-vi.mock("./db", () => ({ prisma: {} }));
+// lib/queries.ts doesn't instantiate a Prisma client. getDeckSummaries now
+// issues a single $queryRaw, so the stub exposes it as a mock.
+vi.mock("./db", () => ({ prisma: { $queryRaw: vi.fn() } }));
 
-import { assembleDeckSummaries, buildCardWhere, parseCardViewParams } from "./queries";
+import { prisma } from "./db";
+import {
+  buildCardWhere,
+  getDeckSummaries,
+  mapDeckSummaryRows,
+  parseCardViewParams,
+} from "./queries";
 
 describe("parseCardViewParams facet parsing", () => {
   it("absent params mean no constraint (undefined)", () => {
@@ -85,40 +92,65 @@ describe("buildCardWhere", () => {
   });
 });
 
-describe("assembleDeckSummaries", () => {
-  const decks = [
-    { id: "d1", name: "Español", language: "es", subject: "languages", description: null, accentColor: null },
-    { id: "d2", name: "日本語", language: "ja", subject: "medicine", description: "test", accentColor: "#FF6B5C" },
-  ];
-
-  it("joins per-deck counts + last-studied onto each deck", () => {
-    const counts = [{ deckId: "d1", cardCount: 1011, readyCount: 12, masteredCount: 40 }];
-    const studied = new Map<string, Date | null>([["d1", new Date("2026-06-01T00:00:00.000Z")]]);
-
-    const out = assembleDeckSummaries(decks, counts, studied);
-
+describe("mapDeckSummaryRows", () => {
+  it("passes a fully-formed aggregate row through as a DeckSummary", () => {
+    const out = mapDeckSummaryRows([
+      {
+        id: "d1", name: "Español", language: "es", subject: "languages",
+        description: null, accentColor: null,
+        cardCount: 1011, readyCount: 12, masteredCount: 40,
+        lastStudied: new Date("2026-06-01T00:00:00.000Z"),
+      },
+    ]);
     expect(out[0]).toEqual({
-      id: "d1", name: "Español", language: "es", subject: "languages", description: null, accentColor: null,
+      id: "d1", name: "Español", language: "es", subject: "languages",
+      description: null, accentColor: null,
       cardCount: 1011, readyCount: 12, masteredCount: 40,
       lastStudied: new Date("2026-06-01T00:00:00.000Z"),
     });
   });
 
-  it("defaults a deck with no cards / no session to zeros + null", () => {
-    const out = assembleDeckSummaries(decks, [], new Map());
-    expect(out[1]).toEqual({
-      id: "d2", name: "日本語", language: "ja", subject: "medicine", description: "test", accentColor: "#FF6B5C",
-      cardCount: 0, readyCount: 0, masteredCount: 0, lastStudied: null,
-    });
+  it("coerces raw pg counts (bigint/string) to numbers and keeps null lastStudied", () => {
+    const out = mapDeckSummaryRows([
+      {
+        id: "d2", name: "日本語", language: "ja", subject: "medicine",
+        description: "test", accentColor: "#FF6B5C",
+        // pg can hand back bigints/strings for aggregate columns
+        cardCount: BigInt(9) as unknown as number,
+        readyCount: "3" as unknown as number,
+        masteredCount: 0,
+        lastStudied: null,
+      },
+    ]);
+    expect(out[0].cardCount).toBe(9);
+    expect(out[0].readyCount).toBe(3);
+    expect(typeof out[0].readyCount).toBe("number");
+    expect(out[0].lastStudied).toBeNull();
+  });
+});
+
+describe("getDeckSummaries", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("issues exactly one aggregate query and maps the rows", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+      {
+        id: "d1", name: "Español", language: "es", subject: "languages",
+        description: null, accentColor: null,
+        cardCount: 5, readyCount: 2, masteredCount: 1,
+        lastStudied: new Date("2026-06-10T00:00:00.000Z"),
+      },
+    ] as never);
+
+    const out = await getDeckSummaries("u1");
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: "d1", cardCount: 5, readyCount: 2, masteredCount: 1 });
   });
 
-  it("preserves deck order regardless of count-row order", () => {
-    const counts = [
-      { deckId: "d2", cardCount: 5, readyCount: 0, masteredCount: 0 },
-      { deckId: "d1", cardCount: 9, readyCount: 0, masteredCount: 0 },
-    ];
-    const out = assembleDeckSummaries(decks, counts, new Map());
-    expect(out.map((d) => d.id)).toEqual(["d1", "d2"]);
-    expect(out[0].cardCount).toBe(9);
+  it("returns [] for a user with no decks", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([] as never);
+    expect(await getDeckSummaries("u1")).toEqual([]);
   });
 });

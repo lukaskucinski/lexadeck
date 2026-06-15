@@ -1,10 +1,11 @@
 /**
- * Instant shell for the authenticated area. Next streams this as the route
- * segment's Suspense fallback, so on a cold PWA launch the nav (from the layout)
- * + this skeleton paint in the first flush — ending the OS "lx." splash right
- * away — while the data-heavy dashboard RSC streams in behind it. Shaped to
- * match the dashboard (header + deck grid) so the swap to real content is calm.
- * Pure markup, no JS.
+ * Instant shell for the dashboard route only. Scoped to the (home) route group
+ * (not the whole authenticated area) so its Suspense boundary doesn't swallow
+ * notFound()'s 404 status on sibling routes like /decks/[id]. Next streams this
+ * as the route segment's fallback, so on a cold PWA launch the nav (from the
+ * layout) + this skeleton paint in the first flush — ending the OS "lx." splash
+ * right away — while the data-heavy dashboard RSC streams in behind it. Shaped
+ * to match the dashboard (header + deck grid) so the swap is calm. No JS.
  */
 function Bar({ className }: { className?: string }) {
   return <div className={`bg-soft ${className ?? ""}`} />;
