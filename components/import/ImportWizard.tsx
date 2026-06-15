@@ -2,8 +2,29 @@
 
 import { useActionState, useState } from "react";
 import { importCards, type ImportState } from "@/lib/actions/import";
+import {
+  ANKI_FIELD_OPTIONS,
+  analyzeSource,
+  defaultMapping,
+  isAnkiExport,
+  parseAnkiText,
+  sourceToCsv,
+  stripAnkiHtml,
+  type AnkiFieldChoice,
+  type AnkiMapping,
+  type AnkiSource,
+} from "@/lib/import/anki";
+import { isApkgName } from "@/lib/import/apkg";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+
+/** One-line, HTML-free preview of an Anki cell for the mapping UI. */
+function sampleText(raw: string | undefined, html: boolean): string {
+  if (!raw) return "—";
+  const text = (html ? stripAnkiHtml(raw) : raw).replace(/\s+/g, " ").trim();
+  if (!text) return "—";
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+}
 
 export interface DeckOption {
   id: string;
@@ -31,6 +52,10 @@ export function ImportWizard({
   const [state, formAction, pending] = useActionState<ImportState, FormData>(importCards, {});
   const [csvText, setCsvText] = useState("");
   const [fileName, setFileName] = useState("");
+  const [ankiSource, setAnkiSource] = useState<AnkiSource | null>(null);
+  const [mapping, setMapping] = useState<AnkiMapping>([]);
+  const [apkgLoading, setApkgLoading] = useState(false);
+  const [apkgError, setApkgError] = useState<string | null>(null);
   const [target, setTarget] = useState(
     initialDeckId && decks.some((d) => d.id === initialDeckId)
       ? initialDeckId
@@ -39,6 +64,13 @@ export function ImportWizard({
   const [lastMode, setLastMode] = useState<"preview" | "import">("preview");
 
   const { error, preview, result } = state;
+
+  // Anki sources (.txt or .apkg) map to the canonical CSV the server already
+  // understands; plain CSV/TSV passes straight through.
+  const anki = ankiSource ? analyzeSource(ankiSource) : null;
+  const submittedCsv = ankiSource ? sourceToCsv(ankiSource, mapping) : csvText;
+  const hasTerm = !ankiSource || mapping.includes("term");
+  const ready = !apkgLoading && hasTerm && !!submittedCsv;
 
   return (
     <form
@@ -50,21 +82,51 @@ export function ImportWizard({
     >
       {/* the file's text lives in React state — React 19 resets the (uncontrolled)
           file input after each action, so the hidden field is the source of truth */}
-      <input type="hidden" name="csvText" value={csvText} />
+      <input type="hidden" name="csvText" value={submittedCsv} />
       <input type="hidden" name="fileName" value={fileName} />
 
       <div className="border-[1.5px] border-line">
         <label className="block border-b border-soft px-5 py-3.5">
-          <span className="label-caps text-muted">CSV file</span>
+          <span className="label-caps text-muted">Import file</span>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <input
               type="file"
-              accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+              accept=".csv,.tsv,.txt,.apkg,text/csv,text/tab-separated-values"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                setCsvText(await file.text());
                 setFileName(file.name);
+                setApkgError(null);
+                // .apkg: a zip with a SQLite collection — parsed lazily in the browser
+                if (isApkgName(file.name)) {
+                  setCsvText("");
+                  setApkgLoading(true);
+                  try {
+                    const { parseApkg } = await import("@/lib/import/apkg");
+                    const src = await parseApkg(await file.arrayBuffer());
+                    setAnkiSource(src);
+                    setMapping(defaultMapping(analyzeSource(src)));
+                  } catch (err) {
+                    setAnkiSource(null);
+                    setMapping([]);
+                    setApkgError(
+                      err instanceof Error ? err.message : "Could not read this .apkg file.",
+                    );
+                  } finally {
+                    setApkgLoading(false);
+                  }
+                  return;
+                }
+                const text = await file.text();
+                setCsvText(text);
+                if (isAnkiExport(text)) {
+                  const src = parseAnkiText(text);
+                  setAnkiSource(src);
+                  setMapping(defaultMapping(analyzeSource(src)));
+                } else {
+                  setAnkiSource(null);
+                  setMapping([]);
+                }
               }}
               className="text-sm font-medium file:mr-3 file:cursor-pointer file:border-[1.5px] file:border-line file:bg-transparent file:px-3 file:py-1.5 file:text-[0.7rem] file:font-extrabold file:tracking-[0.08em] file:uppercase file:text-ink hover:file:bg-ink hover:file:text-bg"
             />
@@ -73,6 +135,64 @@ export function ImportWizard({
             )}
           </div>
         </label>
+
+        {apkgLoading && (
+          <div className="border-b border-soft px-5 py-3.5">
+            <span className="label-caps text-muted">Reading Anki deck…</span>
+          </div>
+        )}
+        {apkgError && (
+          <div className="border-b border-soft px-5 py-3.5">
+            <p className="text-sm font-bold text-coral">{apkgError}</p>
+          </div>
+        )}
+
+        {anki && (
+          <div className="border-b border-soft px-5 py-3.5">
+            <div className="label-caps mb-1 text-muted">Anki import · map fields</div>
+            <p className="mb-3 text-[0.8rem] font-medium text-muted">
+              Choose which LexaDeck field each Anki column maps to.
+              {anki.html ? " HTML and media references are cleaned up automatically." : ""}
+            </p>
+            <div className="space-y-2.5">
+              {Array.from({ length: anki.columnCount }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-bold">
+                      {anki.fieldNames?.[i]?.trim() || `Column ${i + 1}`}
+                    </div>
+                    <div className="truncate text-[0.78rem] font-medium text-muted/80">
+                      {sampleText(anki.sampleRows[0]?.[i], anki.html)}
+                    </div>
+                  </div>
+                  <Select
+                    aria-label={`Map column ${i + 1}`}
+                    value={mapping[i] ?? "ignore"}
+                    onChange={(e) =>
+                      setMapping((prev) => {
+                        const next = [...prev];
+                        next[i] = e.target.value as AnkiFieldChoice;
+                        return next;
+                      })
+                    }
+                    className="w-48 shrink-0"
+                  >
+                    {ANKI_FIELD_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ))}
+            </div>
+            {!hasTerm && (
+              <p className="mt-3 text-sm font-bold text-coral">
+                Map one column to “Term” to continue.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2">
           <label className="block border-b border-soft px-5 py-3.5 sm:border-r">
@@ -113,11 +233,11 @@ export function ImportWizard({
             name="mode"
             value="preview"
             variant="outline"
-            disabled={pending || !csvText}
+            disabled={pending || !ready}
           >
             {pending && lastMode === "preview" ? "Checking…" : "Preview"}
           </Button>
-          <Button type="submit" name="mode" value="import" disabled={pending || !csvText}>
+          <Button type="submit" name="mode" value="import" disabled={pending || !ready}>
             {pending && lastMode === "import" ? "Importing…" : "Import"}
           </Button>
           {!csvText && <span className="label-caps text-muted">choose a file to begin</span>}
