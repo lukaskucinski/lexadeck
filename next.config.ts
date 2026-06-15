@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
 // webpack-based) emits per-route bundle treemaps to .next/analyze — used to
 // inspect module composition (e.g. motion off /welcome). Actual served bytes
 // are measured by scripts/perf-probe.ts. A no-op for normal Turbopack builds.
-export default withBundleAnalyzer({ enabled: process.env.ANALYZE === "true" })(
-  nextConfig,
-);
+export default withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+  // write the reports to .next/analyze without spawning browser tabs — open them
+  // manually (e.g. .next/analyze/client.html) when you want to inspect.
+  openAnalyzer: false,
+})(nextConfig);
