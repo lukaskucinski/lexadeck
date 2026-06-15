@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { azureTranslate, geminiEnrich, normalizeEnrichment } from "./enrichment";
+import { getLanguageProfile } from "./languages";
 
 // Values pasted into the Vercel dashboard can carry a BOM (U+FEFF) — these
 // tests pin the env-sanitizing behavior that fixed enrichment in production.
@@ -114,6 +115,7 @@ describe("normalizeEnrichment", () => {
       example: "Espero gozar de buena salud.",
       exampleEn: "I hope to enjoy good health.",
       emoji: "😀",
+      reading: "",
       usagePattern: "gozar de + noun",
       collocations: ["gozar de buena salud", "gozar de libertad"],
       conjugation: "gozo, gozas, goza",
@@ -205,6 +207,7 @@ describe("normalizeEnrichment", () => {
       example: "",
       exampleEn: "",
       emoji: "",
+      reading: "",
       usagePattern: "",
       collocations: [],
       conjugation: "",
@@ -213,5 +216,42 @@ describe("normalizeEnrichment", () => {
       synonyms: [],
       correction: "",
     });
+  });
+
+  describe("per-language profile", () => {
+    const ja = getLanguageProfile("ja")!;
+    const de = getLanguageProfile("de")!;
+
+    it("drops gender for a non-gendered language even on a noun", () => {
+      const out = normalizeEnrichment({ id: "c1", wordType: "NOUN", gender: "MASCULINE" }, ja);
+      expect(out.gender).toBeNull();
+    });
+
+    it("keeps a Japanese reading", () => {
+      const out = normalizeEnrichment({ id: "c1", reading: " いぬ (inu) " }, ja);
+      expect(out.reading).toBe("いぬ (inu)");
+    });
+
+    it("accepts German der/die/das genders but not EITHER", () => {
+      expect(
+        normalizeEnrichment({ id: "c1", wordType: "NOUN", gender: "neuter" }, de).gender,
+      ).toBe("NEUTER");
+      expect(
+        normalizeEnrichment({ id: "c1", wordType: "NOUN", gender: "EITHER" }, de).gender,
+      ).toBeNull();
+    });
+  });
+});
+
+describe("azureTranslate direction by profile", () => {
+  it("uses the profile's source/target in the request URL", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_KEY", "k");
+    vi.stubEnv("AZURE_TRANSLATOR_REGION", "eastus");
+    vi.stubEnv("AZURE_TRANSLATOR_ENDPOINT", "");
+    const fetchMock = vi.fn().mockResolvedValue(okJson([{ translations: [{ text: "dog" }] }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await azureTranslate(["犬"], getLanguageProfile("ja")!);
+    expect(fetchMock.mock.calls[0][0]).toContain("from=ja&to=en");
   });
 });

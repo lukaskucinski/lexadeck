@@ -36,7 +36,9 @@ export function Greeting({
     : greetingFor(greetingLang, serverHour);
 
   return (
-    <h1 className="type-display text-5xl md:text-7xl">
+    // looser than type-display's 0.95 so the greeting's descenders (e.g. "guten")
+    // don't crowd the name on the second line
+    <h1 className="type-display text-5xl md:text-7xl" style={{ lineHeight: 1.1 }}>
       {greeting},
       <br />
       <span className="text-coral">{displayName.toLowerCase()}.</span>

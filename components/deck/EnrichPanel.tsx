@@ -62,9 +62,16 @@ function CheckRow({
  * "AI enrich" for a whole deck. Picks a target population (never enriched /
  * stale / re-enrich) and hands the resolved card ids to the shared useEnrichRun
  * engine (chunked server-action loop, live progress, Cancel, graceful quota
- * stop). Spanish decks only (the parent renders it only for es decks).
+ * stop). Rendered only for enrichable languages; the verb-tables pass is shown
+ * only when the language has structured conjugation tables (Spanish in Phase 1).
  */
-export function EnrichPanel({ deckId }: { deckId: string }) {
+export function EnrichPanel({
+  deckId,
+  conjugationEnabled,
+}: {
+  deckId: string;
+  conjugationEnabled: boolean;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const { run, cancel, fail, reset, running, progress, message, error } = useEnrichRun(deckId);
 
@@ -192,18 +199,20 @@ export function EnrichPanel({ deckId }: { deckId: string }) {
                 />
               </div>
 
-              <div className="mt-3 border-t border-soft pt-3">
-                <CheckRow
-                  checked={includeConjugation}
-                  onToggle={() => setIncludeConjugation((v) => !v)}
-                  label="Also build verb tables"
-                  count={counts?.verbsWithoutTable ?? 0}
-                  disabled={running}
-                />
-                <p className="mt-1 text-[0.7rem] leading-snug text-muted">
-                  Full conjugation tables cost one AI call per verb — leave off to save quota.
-                </p>
-              </div>
+              {conjugationEnabled && (
+                <div className="mt-3 border-t border-soft pt-3">
+                  <CheckRow
+                    checked={includeConjugation}
+                    onToggle={() => setIncludeConjugation((v) => !v)}
+                    label="Also build verb tables"
+                    count={counts?.verbsWithoutTable ?? 0}
+                    disabled={running}
+                  />
+                  <p className="mt-1 text-[0.7rem] leading-snug text-muted">
+                    Full conjugation tables cost one AI call per verb — leave off to save quota.
+                  </p>
+                </div>
+              )}
 
               <div className="mt-4 flex items-center gap-3 border-t border-soft pt-4">
                 {running ? (

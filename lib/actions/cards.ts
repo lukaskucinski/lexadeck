@@ -10,6 +10,7 @@ import {
   normalizeEnrichment,
   translateBatch,
 } from "@/lib/ai/enrichment";
+import { getLanguageProfile, type LanguageProfile } from "@/lib/ai/languages";
 import { requireUser } from "@/lib/auth";
 import {
   detailsFromEnrichment,
@@ -17,7 +18,11 @@ import {
   getCardDetails,
   withoutCorrection,
 } from "@/lib/cardDetails";
-import { buildConjugationTable, type ConjTable, normalizeSimpleConjugation } from "@/lib/conjugation";
+import {
+  type ConjugationData,
+  type ConjugationSpec,
+  getConjugationSpec,
+} from "@/lib/conjugation";
 import { prisma } from "@/lib/db";
 import { sanitizeEmoji } from "@/lib/emoji";
 import { type EnrichTargetBucket, isQuotaError } from "@/lib/enrichBatch";
@@ -243,34 +248,42 @@ export async function enrichCard(cardId: string): Promise<{ error?: string }> {
   const user = await requireUser();
   const card = await prisma.card.findFirst({
     where: { id: cardId, deck: { userId: user.id } },
+    include: { deck: { select: { language: true } } },
   });
   if (!card) return { error: "Card not found" };
   if (card.wordType === "GRAMMAR") {
     return { error: "Grammar cards aren't auto-enriched" };
   }
+  const profile = getLanguageProfile(card.deck.language);
+  if (!profile) {
+    return { error: "AI enrichment isn't available for this deck's language yet" };
+  }
 
   try {
     let translation = card.translation;
     if (!translation) {
-      const { out } = await translateBatch([card.term]);
+      const { out } = await translateBatch([card.term], profile);
       translation = out[0]?.trim() || null;
     }
 
-    const [raw] = await geminiEnrich([
-      {
-        id: card.id,
-        term: card.term,
-        translation,
-        wordType: card.wordType,
-        gender: card.gender,
-        notes: card.notes,
-      },
-    ]);
+    const [raw] = await geminiEnrich(
+      [
+        {
+          id: card.id,
+          term: card.term,
+          translation,
+          wordType: card.wordType,
+          gender: card.gender,
+          notes: card.notes,
+        },
+      ],
+      profile,
+    );
     if (!raw) return { error: "The AI returned no enrichment for this card" };
 
     await prisma.card.update({
       where: { id: cardId },
-      data: enrichmentUpdateData(card, normalizeEnrichment(raw), translation),
+      data: enrichmentUpdateData(card, normalizeEnrichment(raw, profile), translation),
     });
     revalidateCardPaths(card.deckId);
     revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
@@ -290,29 +303,23 @@ export async function previewEnrichment(
   deckId: string,
   term: string,
 ): Promise<{ preview?: EnrichmentPreview; error?: string }> {
-  const user = await requireUser();
-  const deck = await prisma.deck.findFirst({
-    where: { id: deckId, userId: user.id },
-    select: { language: true },
-  });
-  if (!deck) return { error: "Deck not found" };
-  if (deck.language !== "es") {
-    return { error: "Auto-fill currently supports Spanish decks only" };
-  }
+  const gate = await requireEnrichableDeck(deckId);
+  if ("error" in gate) return { error: gate.error };
 
   const cleaned = term.trim();
   if (!cleaned) return { error: "Enter a term first" };
   if (cleaned.length > 200) return { error: "Term is too long" };
 
   try {
-    const { out } = await translateBatch([cleaned]);
+    const { out } = await translateBatch([cleaned], gate.profile);
     const translation = out[0]?.trim() || null;
 
-    const [raw] = await geminiEnrich([
-      { id: "preview", term: cleaned, translation, wordType: null, gender: null, notes: null },
-    ]);
+    const [raw] = await geminiEnrich(
+      [{ id: "preview", term: cleaned, translation, wordType: null, gender: null, notes: null }],
+      gate.profile,
+    );
     if (!raw) return { error: "The AI returned no suggestion" };
-    const item = normalizeEnrichment(raw);
+    const item = normalizeEnrichment(raw, gate.profile);
 
     return {
       preview: {
@@ -333,20 +340,19 @@ export async function previewEnrichment(
 }
 
 /**
- * Generate + cache the full conjugation table for one verb card record. Gemini
- * returns only the SIMPLE forms; lib/conjugation.ts derives every compound tense
- * from the participle + the fixed `haber` paradigm. A cached table is returned
- * untouched. The caller owns auth + the VERB/es gate.
+ * Generate + cache the full conjugation table for one verb card record, using
+ * the language's ConjugationSpec (spec.build turns the AI's raw JSON into the
+ * display table; Spanish derives its compound tenses there). A cached table is
+ * returned untouched. The caller owns auth + the VERB / language gate.
  */
-async function buildAndCacheConjugation(card: {
-  id: string;
-  term: string;
-  details: unknown;
-}): Promise<ConjTable> {
+async function buildAndCacheConjugation(
+  card: { id: string; term: string; details: unknown },
+  spec: ConjugationSpec,
+): Promise<ConjugationData> {
   const existing = getCardDetails(card.details);
   if (existing.conjugationTable) return existing.conjugationTable;
-  const raw = await geminiConjugate(card.term);
-  const table = buildConjugationTable(card.term, normalizeSimpleConjugation(raw));
+  const raw = await geminiConjugate(card.term, spec);
+  const table = spec.build(card.term, raw);
   await prisma.card.update({
     where: { id: card.id },
     data: { details: { ...existing, conjugationTable: table } },
@@ -356,11 +362,11 @@ async function buildAndCacheConjugation(card: {
 
 /**
  * Generate (and cache) the full conjugation table for a verb card, on demand.
- * Spanish verbs only.
+ * Available for any language with a ConjugationSpec (es/ja/de).
  */
 export async function conjugateVerb(
   cardId: string,
-): Promise<{ table?: ConjTable; error?: string }> {
+): Promise<{ table?: ConjugationData; error?: string }> {
   const user = await requireUser();
   const card = await prisma.card.findFirst({
     where: { id: cardId, deck: { userId: user.id } },
@@ -368,12 +374,11 @@ export async function conjugateVerb(
   });
   if (!card) return { error: "Card not found" };
   if (card.wordType !== "VERB") return { error: "Only verbs can be conjugated" };
-  if (card.deck.language !== "es") {
-    return { error: "Conjugation currently supports Spanish verbs only" };
-  }
+  const spec = getConjugationSpec(card.deck.language);
+  if (!spec) return { error: "Conjugation isn't available for this language yet" };
 
   try {
-    const table = await buildAndCacheConjugation(card);
+    const table = await buildAndCacheConjugation(card, spec);
     revalidatePath(`/decks/${card.deckId}/cards/${cardId}`);
     return { table };
   } catch (err) {
@@ -387,20 +392,24 @@ export async function conjugateVerb(
 
 const NON_GRAMMAR = { not: "GRAMMAR" } as const;
 
-/** Resolve a user-owned deck and enforce the Spanish-only AI gate. */
-async function requireEsDeck(
+/**
+ * Resolve a user-owned deck and its enrichment LanguageProfile. Only languages
+ * with a tuned profile (es/ja/de) are enrichable; everything else is rejected.
+ */
+async function requireEnrichableDeck(
   deckId: string,
-): Promise<{ userId: string } | { error: string }> {
+): Promise<{ userId: string; profile: LanguageProfile } | { error: string }> {
   const user = await requireUser();
   const deck = await prisma.deck.findFirst({
     where: { id: deckId, userId: user.id },
     select: { language: true },
   });
   if (!deck) return { error: "Deck not found" };
-  if (deck.language !== "es") {
-    return { error: "Batch enrichment currently supports Spanish decks only" };
+  const profile = getLanguageProfile(deck.language);
+  if (!profile) {
+    return { error: "AI enrichment isn't available for this deck's language yet" };
   }
-  return { userId: user.id };
+  return { userId: user.id, profile };
 }
 
 /** Prisma where-fragment for a deck's non-grammar cards in one enrich bucket. */
@@ -432,14 +441,17 @@ export interface EnrichTargetCounts {
 export async function getEnrichTargets(
   deckId: string,
 ): Promise<{ counts?: EnrichTargetCounts; error?: string }> {
-  const gate = await requireEsDeck(deckId);
+  const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { error: gate.error };
 
   const [neverEnriched, stale, enriched, verbs] = await Promise.all([
     prisma.card.count({ where: bucketWhere(deckId, "neverEnriched") }),
     prisma.card.count({ where: bucketWhere(deckId, "stale") }),
     prisma.card.count({ where: bucketWhere(deckId, "enriched") }),
-    prisma.card.findMany({ where: { deckId, wordType: "VERB" }, select: { details: true } }),
+    // conjugation tables are language-specific; only count when this language has them
+    gate.profile.conjugation.table
+      ? prisma.card.findMany({ where: { deckId, wordType: "VERB" }, select: { details: true } })
+      : Promise.resolve([]),
   ]);
   const verbsWithoutTable = verbs.filter(
     (v) => !getCardDetails(v.details).conjugationTable,
@@ -455,7 +467,7 @@ export async function getEnrichCardIds(
   deckId: string,
   buckets: EnrichTargetBucket[],
 ): Promise<{ ids?: string[]; error?: string }> {
-  const gate = await requireEsDeck(deckId);
+  const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { error: gate.error };
 
   const valid = buckets.filter((b) => ENRICH_BUCKETS.includes(b));
@@ -486,7 +498,7 @@ export async function enrichCards(
   deckId: string,
   cardIds: string[],
 ): Promise<{ results: CardEnrichResult[]; quotaExhausted: boolean; error?: string }> {
-  const gate = await requireEsDeck(deckId);
+  const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { results: [], quotaExhausted: false, error: gate.error };
   if (cardIds.length === 0) return { results: [], quotaExhausted: false };
 
@@ -500,7 +512,7 @@ export async function enrichCards(
     const needTranslation = cards.filter((c) => !c.translation);
     const translated = new Map<string, string | null>();
     if (needTranslation.length) {
-      const { out } = await translateBatch(needTranslation.map((c) => c.term));
+      const { out } = await translateBatch(needTranslation.map((c) => c.term), gate.profile);
       needTranslation.forEach((c, i) => translated.set(c.id, out[i]?.trim() || null));
     }
     const translationFor = (c: (typeof cards)[number]) =>
@@ -516,6 +528,7 @@ export async function enrichCards(
         gender: c.gender,
         notes: c.notes,
       })),
+      gate.profile,
     );
     const byId = new Map(raws.map((r) => [String(r.id), r]));
 
@@ -528,7 +541,7 @@ export async function enrichCards(
       }
       await prisma.card.update({
         where: { id: card.id },
-        data: enrichmentUpdateData(card, normalizeEnrichment(raw), translationFor(card)),
+        data: enrichmentUpdateData(card, normalizeEnrichment(raw, gate.profile), translationFor(card)),
       });
       results.push({ id: card.id, ok: true });
     }
@@ -548,8 +561,9 @@ export async function enrichCards(
 export async function getConjugationTargetIds(
   deckId: string,
 ): Promise<{ ids?: string[]; error?: string }> {
-  const gate = await requireEsDeck(deckId);
+  const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { error: gate.error };
+  if (!gate.profile.conjugation.table) return { ids: [] };
 
   const verbs = await prisma.card.findMany({
     where: { deckId, wordType: "VERB" },
@@ -570,8 +584,16 @@ export async function conjugateVerbs(
   deckId: string,
   cardIds: string[],
 ): Promise<{ results: CardEnrichResult[]; quotaExhausted: boolean; error?: string }> {
-  const gate = await requireEsDeck(deckId);
+  const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { results: [], quotaExhausted: false, error: gate.error };
+  const spec = getConjugationSpec(gate.profile.code);
+  if (!gate.profile.conjugation.table || !spec) {
+    return {
+      results: [],
+      quotaExhausted: false,
+      error: "Conjugation tables aren't available for this language yet",
+    };
+  }
   if (cardIds.length === 0) return { results: [], quotaExhausted: false };
 
   const verbs = await prisma.card.findMany({
@@ -583,7 +605,7 @@ export async function conjugateVerbs(
   let quotaExhausted = false;
   for (const verb of verbs) {
     try {
-      await buildAndCacheConjugation(verb);
+      await buildAndCacheConjugation(verb, spec);
       results.push({ id: verb.id, ok: true });
     } catch (err) {
       const message = (err as Error).message ?? "conjugation failed";
@@ -618,7 +640,7 @@ export async function resolveEnrichSelection(
   deckId: string,
   cardIds: string[],
 ): Promise<{ resolved?: ResolvedEnrichSelection; error?: string }> {
-  const gate = await requireEsDeck(deckId);
+  const gate = await requireEnrichableDeck(deckId);
   if ("error" in gate) return { error: gate.error };
   if (cardIds.length === 0) {
     return { resolved: { enrichIds: [], verbIdsWithoutTable: [], skipped: 0 } };
@@ -630,9 +652,11 @@ export async function resolveEnrichSelection(
     orderBy: { createdAt: "asc" },
   });
   const enrichIds = cards.map((c) => c.id);
-  const verbIdsWithoutTable = cards
-    .filter((c) => c.wordType === "VERB" && !getCardDetails(c.details).conjugationTable)
-    .map((c) => c.id);
+  const verbIdsWithoutTable = gate.profile.conjugation.table
+    ? cards
+        .filter((c) => c.wordType === "VERB" && !getCardDetails(c.details).conjugationTable)
+        .map((c) => c.id)
+    : [];
 
   return {
     resolved: { enrichIds, verbIdsWithoutTable, skipped: cardIds.length - enrichIds.length },

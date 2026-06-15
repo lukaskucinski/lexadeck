@@ -1,10 +1,13 @@
 /**
  * One-off enrichment script. Two passes, both resumable; grammar rules skipped.
+ * Cards are grouped by their deck's language and enriched with that language's
+ * profile (es/ja/de); cards in untuned languages are skipped.
  *
- *   Pass 1 — Azure AI Translator F0 (primary ES→EN): fills `translation` where
- *            NULL. DeepL is an optional fallback (ENABLE_DEEPL_FALLBACK=true);
+ *   Pass 1 — Azure AI Translator F0 (primary, <lang>→EN): fills `translation`
+ *            where NULL. DeepL is an optional fallback (ENABLE_DEEPL_FALLBACK=true);
  *            its Developer-tier quota is LIFETIME, so it is off by default.
- *   Pass 2 — Gemini: fills `example`, `exampleEn`, `emoji`; sets `enrichedAt`.
+ *   Pass 2 — Gemini: fills `example`, `exampleEn`, `emoji`, `reading`, details;
+ *            sets `enrichedAt`.
  *
  * Usage:
  *   npx tsx scripts/enrich.ts [--limit N] [--dry-run]
@@ -21,8 +24,27 @@ import {
   type RawEnrichment,
   translateBatch,
 } from "../lib/ai/enrichment";
+import { getLanguageProfile, type LanguageProfile } from "../lib/ai/languages";
 import { detailsFromEnrichment } from "../lib/cardDetails";
 import { prisma } from "../lib/db";
+
+/** Group cards by their deck language, keeping only tuned (enrichable) languages. */
+function groupEnrichable<T extends { deck: { language: string } }>(
+  cards: T[],
+): { groups: Map<string, T[]>; skipped: number } {
+  const groups = new Map<string, T[]>();
+  let skipped = 0;
+  for (const c of cards) {
+    if (!getLanguageProfile(c.deck.language)) {
+      skipped++;
+      continue;
+    }
+    const list = groups.get(c.deck.language);
+    if (list) list.push(c);
+    else groups.set(c.deck.language, [c]);
+  }
+  return { groups, skipped };
+}
 
 const { values: args } = parseArgs({
   options: {
@@ -47,27 +69,37 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function passTranslate(): Promise<void> {
   const cards = await prisma.card.findMany({
     where: { translation: null, wordType: { not: "GRAMMAR" } },
-    select: { id: true, term: true },
+    select: { id: true, term: true, deck: { select: { language: true } } },
     orderBy: { createdAt: "asc" },
   });
 
-  console.log(`Pass 1 (Azure Translator): ${cards.length} cards missing translations`);
-  if (cards.length === 0 || DRY) {
-    if (DRY && cards.length > 0) {
-      console.log("  dry-run, would translate:", cards.map((c) => c.term).join(", "));
+  const { groups, skipped } = groupEnrichable(cards);
+  const total = cards.length - skipped;
+  console.log(
+    `Pass 1 (Azure Translator): ${total} cards missing translations` +
+      (skipped ? ` (${skipped} skipped — untuned language)` : ""),
+  );
+  if (total === 0 || DRY) {
+    if (DRY && total > 0) {
+      for (const [lang, group] of groups) {
+        console.log(`  dry-run [${lang}], would translate:`, group.map((c) => c.term).join(", "));
+      }
     }
     return;
   }
 
-  for (let i = 0; i < cards.length; i += 50) {
-    const batch = cards.slice(i, i + 50);
-    const { provider, out } = await translateBatch(batch.map((c) => c.term));
-    for (let j = 0; j < batch.length; j++) {
-      await prisma.card.update({
-        where: { id: batch[j].id },
-        data: { translation: out[j] },
-      });
-      console.log(`  [${provider}] ${batch[j].term} → ${out[j]}`);
+  for (const [lang, group] of groups) {
+    const profile = getLanguageProfile(lang)!;
+    for (let i = 0; i < group.length; i += 50) {
+      const batch = group.slice(i, i + 50);
+      const { provider, out } = await translateBatch(batch.map((c) => c.term), profile);
+      for (let j = 0; j < batch.length; j++) {
+        await prisma.card.update({
+          where: { id: batch[j].id },
+          data: { translation: out[j] },
+        });
+        console.log(`  [${provider}/${lang}] ${batch[j].term} → ${out[j]}`);
+      }
     }
   }
 }
@@ -76,44 +108,32 @@ async function passTranslate(): Promise<void> {
 /* Pass 2 — Gemini enrichment (provider lives in lib/ai/enrichment.ts) */
 /* ------------------------------------------------------------------ */
 
-async function passGemini(): Promise<void> {
-  const cards = await prisma.card.findMany({
-    where: { enrichedAt: null, wordType: { not: "GRAMMAR" } },
-    select: {
-      id: true,
-      term: true,
-      translation: true,
-      wordType: true,
-      gender: true,
-      notes: true,
-    },
-    orderBy: { createdAt: "asc" },
-    take: Number.isFinite(LIMIT) ? Number(LIMIT) : undefined,
-  });
+type GeminiCard = {
+  id: string;
+  term: string;
+  translation: string | null;
+  wordType: string;
+  gender: string | null;
+  notes: string | null;
+  deck: { language: string };
+};
 
-  console.log(`Pass 2 (Gemini): ${cards.length} cards to enrich`);
-  if (cards.length === 0 || DRY) {
-    if (DRY && cards.length > 0) {
-      console.log(`  dry-run, would enrich in ${Math.ceil(cards.length / GEMINI_BATCH)} batches`);
-    }
-    return;
-  }
-
-  async function enrichWithRetry(batch: typeof cards): Promise<RawEnrichment[]> {
+async function enrichGroup(group: GeminiCard[], profile: LanguageProfile): Promise<void> {
+  async function enrichWithRetry(batch: GeminiCard[]): Promise<RawEnrichment[]> {
     try {
-      return await geminiEnrich(batch);
+      return await geminiEnrich(batch, profile);
     } catch (err) {
       console.warn(`  transient failure (${(err as Error).message.slice(0, 80)}…) — retrying in 30s`);
       await sleep(GEMINI_RETRY_DELAY_MS);
-      return geminiEnrich(batch);
+      return geminiEnrich(batch, profile);
     }
   }
 
-  for (let i = 0; i < cards.length; i += GEMINI_BATCH) {
-    const batch = cards.slice(i, i + GEMINI_BATCH);
+  for (let i = 0; i < group.length; i += GEMINI_BATCH) {
+    const batch = group.slice(i, i + GEMINI_BATCH);
     try {
       const raws = await enrichWithRetry(batch);
-      const byId = new Map(raws.map((r) => [String(r.id), normalizeEnrichment(r)]));
+      const byId = new Map(raws.map((r) => [String(r.id), normalizeEnrichment(r, profile)]));
       for (const card of batch) {
         const item = byId.get(card.id);
         if (!item) {
@@ -132,12 +152,46 @@ async function passGemini(): Promise<void> {
           },
         });
       }
-      console.log(`  enriched ${Math.min(i + GEMINI_BATCH, cards.length)}/${cards.length}`);
+      console.log(`  [${profile.code}] enriched ${Math.min(i + GEMINI_BATCH, group.length)}/${group.length}`);
     } catch (err) {
       console.error(`  batch failed (cards ${i}–${i + batch.length}): ${(err as Error).message}`);
       console.error("  continuing; re-run the script to retry failed cards.");
     }
-    if (i + GEMINI_BATCH < cards.length) await sleep(GEMINI_PACE_MS);
+    if (i + GEMINI_BATCH < group.length) await sleep(GEMINI_PACE_MS);
+  }
+}
+
+async function passGemini(): Promise<void> {
+  const cards = await prisma.card.findMany({
+    where: { enrichedAt: null, wordType: { not: "GRAMMAR" } },
+    select: {
+      id: true,
+      term: true,
+      translation: true,
+      wordType: true,
+      gender: true,
+      notes: true,
+      deck: { select: { language: true } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: Number.isFinite(LIMIT) ? Number(LIMIT) : undefined,
+  });
+
+  const { groups, skipped } = groupEnrichable(cards);
+  const total = cards.length - skipped;
+  console.log(
+    `Pass 2 (Gemini): ${total} cards to enrich` +
+      (skipped ? ` (${skipped} skipped — untuned language)` : ""),
+  );
+  if (total === 0 || DRY) {
+    if (DRY && total > 0) {
+      console.log(`  dry-run, would enrich in ${Math.ceil(total / GEMINI_BATCH)} batches`);
+    }
+    return;
+  }
+
+  for (const [lang, group] of groups) {
+    await enrichGroup(group, getLanguageProfile(lang)!);
   }
 }
 

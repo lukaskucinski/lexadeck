@@ -18,9 +18,12 @@ import { useEnrichRun } from "./useEnrichRun";
 export function DeckSelectionBar({
   deckId,
   enrichEnabled,
+  conjugationEnabled,
 }: {
   deckId: string;
   enrichEnabled: boolean;
+  /** structured verb-conjugation tables available for this deck's language */
+  conjugationEnabled: boolean;
 }) {
   const { selected, clear } = useDeckSelection(deckId);
   const enrich = useEnrichRun(deckId);
@@ -76,7 +79,7 @@ export function DeckSelectionBar({
             </Button>
           ) : (
             <>
-              {enrichEnabled && hasVerb && (
+              {conjugationEnabled && hasVerb && (
                 <label
                   className={`flex items-center gap-1.5 text-[0.7rem] font-semibold ${
                     busy ? "opacity-40" : "cursor-pointer text-muted"

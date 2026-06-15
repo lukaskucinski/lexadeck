@@ -21,9 +21,17 @@ describe("greetingFor", () => {
     expect(greetingFor(lang, hour)).toBe(expected);
   });
 
+  it.each([
+    ["de", 8, "guten morgen"],
+    ["de", 14, "guten tag"],
+    ["de", 21, "guten abend"],
+  ])("german: hour %i#%i → %s", (lang, hour, expected) => {
+    expect(greetingFor(lang, hour)).toBe(expected);
+  });
+
   it("falls back to english for unsupported languages", () => {
     expect(greetingFor("fr", 8)).toBe("good morning");
-    expect(greetingFor("de", 14)).toBe("good afternoon");
+    expect(greetingFor("it", 14)).toBe("good afternoon");
     expect(greetingFor("ko", 21)).toBe("good evening");
   });
 

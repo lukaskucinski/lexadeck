@@ -4,7 +4,7 @@
  */
 import "dotenv/config";
 import { geminiConjugate, geminiEnrich, normalizeEnrichment } from "../lib/ai/enrichment";
-import { buildConjugationTable, normalizeSimpleConjugation } from "../lib/conjugation";
+import { getConjugationSpec } from "../lib/conjugation";
 
 async function testAzure(): Promise<void> {
   const key = process.env.AZURE_TRANSLATOR_KEY;
@@ -52,12 +52,16 @@ async function testGemini(): Promise<void> {
 
 async function testConjugation(): Promise<void> {
   // pedir is the e→i stem-changer the deterministic JS libs got wrong
-  const raw = await geminiConjugate("pedir");
-  const t = buildConjugationTable("pedir", normalizeSimpleConjugation(raw));
+  const spec = getConjugationSpec("es")!;
+  const raw = await geminiConjugate("pedir", spec);
+  const data = spec.build("pedir", raw);
+  const tenses = data.groups.flatMap((g) => g.tenses);
+  const present = tenses.find((t) => t.label === "Present");
+  const presentPerfect = tenses.find((t) => t.label === "Present perfect");
   console.log("GEMINI CONJUGATION OK (pedir):");
-  console.log(`  present:    ${t.indicativePresent.join(", ")}`);
-  console.log(`  participle: ${t.participle}`);
-  console.log(`  pres.perfect (derived): ${t.presentPerfect.join(", ")}`);
+  console.log(`  present:    ${present?.forms.join(", ")}`);
+  console.log(`  headers:    ${data.headers.map((h) => `${h.label}=${h.value}`).join("  ")}`);
+  console.log(`  pres.perfect (derived): ${presentPerfect?.forms.join(", ")}`);
 }
 
 async function main() {

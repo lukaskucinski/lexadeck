@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Synonym } from "@/lib/ai/enrichment";
 
-/** Spanish synonyms; each reveals its direct English gloss on hover/focus/tap. */
+/** Target-language synonyms; each reveals its direct English gloss on hover/focus/tap. */
 export function SynonymList({ items }: { items: Synonym[] }) {
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-2.5 text-sm">

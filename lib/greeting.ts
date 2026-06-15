@@ -3,9 +3,12 @@
  * (board feedback: Ari's Japanese profile was greeted in Spanish).
  */
 
+// Stored lowercase to match the others; the dashboard hero is text-transform:
+// lowercase anyway, so German nouns (Morgen/Tag/Abend) render lowercase by design.
 const GREETINGS: Record<string, [morning: string, day: string, evening: string]> = {
   es: ["buenos días", "buenas tardes", "buenas noches"],
   ja: ["おはよう", "こんにちは", "こんばんは"],
+  de: ["guten morgen", "guten tag", "guten abend"],
   en: ["good morning", "good afternoon", "good evening"],
 };
 

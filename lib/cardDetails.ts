@@ -6,18 +6,20 @@
  * per field. Always read through getCardDetails (legacy rows are null).
  */
 import type { EnrichmentItem, Synonym } from "./ai/enrichment";
-import type { ConjTable } from "./conjugation";
+import type { ConjugationData } from "./conjugation";
 
 // A `type` (not `interface`) so TS gives it an implicit index signature and it
 // stays assignable to Prisma's Json input type at the write sites.
 export type CardDetails = {
+  /** Pronunciation reading (e.g. Japanese kana/romaji). Empty for Latin-script langs. */
+  reading?: string;
   usagePattern?: string;
   collocations?: string[];
   etymology?: string;
   wordFamily?: string[];
   synonyms?: Synonym[];
-  /** Full verb conjugation table, generated on demand by conjugateVerb. */
-  conjugationTable?: ConjTable;
+  /** Full verb conjugation table (language-agnostic), generated on demand by conjugateVerb. */
+  conjugationTable?: ConjugationData;
   /** Non-destructive "did you mean…?" flag; cleared when term/translation changes. */
   correction?: string;
 };
@@ -38,6 +40,7 @@ export interface EnrichmentPreview {
 /** Build the persisted detail object from a normalized enrichment — only non-empty fields. */
 export function detailsFromEnrichment(item: EnrichmentItem): CardDetails {
   const d: CardDetails = {};
+  if (item.reading) d.reading = item.reading;
   if (item.usagePattern) d.usagePattern = item.usagePattern;
   if (item.collocations.length) d.collocations = item.collocations;
   if (item.etymology) d.etymology = item.etymology;
@@ -58,6 +61,7 @@ export function getCardDetails(raw: unknown): CardDetails {
       ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
       : [];
 
+  if (str(r.reading)) out.reading = str(r.reading);
   if (str(r.usagePattern)) out.usagePattern = str(r.usagePattern);
   if (list(r.collocations).length) out.collocations = list(r.collocations);
   if (str(r.etymology)) out.etymology = str(r.etymology);
@@ -74,8 +78,14 @@ export function getCardDetails(raw: unknown): CardDetails {
         .filter((s) => s.es && s.en)
     : [];
   if (syns.length) out.synonyms = syns;
-  if (r.conjugationTable && typeof r.conjugationTable === "object" && !Array.isArray(r.conjugationTable)) {
-    out.conjugationTable = r.conjugationTable as ConjTable;
+  // Only accept the current self-describing shape (has `groups`). Legacy Spanish
+  // ConjTable caches lack it → treated as absent so the panel regenerates them.
+  if (
+    r.conjugationTable &&
+    typeof r.conjugationTable === "object" &&
+    Array.isArray((r.conjugationTable as { groups?: unknown }).groups)
+  ) {
+    out.conjugationTable = r.conjugationTable as ConjugationData;
   }
   if (str(r.correction)) out.correction = str(r.correction);
   return out;

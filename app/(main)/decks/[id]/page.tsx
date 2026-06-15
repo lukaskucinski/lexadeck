@@ -17,6 +17,7 @@ import { SelectHint } from "@/components/deck/SelectHint";
 import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getLanguageProfile } from "@/lib/ai/languages";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import {
@@ -120,10 +121,20 @@ export default async function DeckDetailPage({
     }
   }
 
+  // enrichment opens to any tuned language (es/ja/de); structured conjugation
+  // tables are language-specific (Spanish only until Phase 2).
+  const enrichProfile = getLanguageProfile(deck.language);
+  const enrichEnabled = enrichProfile != null;
+  const conjugationEnabled = enrichProfile?.conjugation.table ?? false;
+
   return (
     <div>
       <LastDeckCookie deckId={id} />
-      <DeckSelectionBar deckId={id} enrichEnabled={deck.language === "es"} />
+      <DeckSelectionBar
+        deckId={id}
+        enrichEnabled={enrichEnabled}
+        conjugationEnabled={conjugationEnabled}
+      />
       {/* /decks auto-opens this deck again — ?all=1 suppresses the redirect */}
       <nav className="label-caps mb-4">
         <Link href="/decks?all=1" className="text-muted hover:text-ink">
@@ -153,7 +164,9 @@ export default async function DeckDetailPage({
             <h1 className="type-display text-4xl md:text-5xl">{deck.name}</h1>
           </div>
           <div className="flex items-center gap-3">
-            {deck.language === "es" && <EnrichPanel deckId={id} />}
+            {enrichEnabled && (
+              <EnrichPanel deckId={id} conjugationEnabled={conjugationEnabled} />
+            )}
             <ButtonLink href={`/decks/${id}/cards/new`} variant="outline">
               + Card
             </ButtonLink>
