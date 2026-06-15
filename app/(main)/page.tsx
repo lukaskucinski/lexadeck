@@ -55,7 +55,9 @@ export default async function DashboardPage() {
           lexadeck<span className="text-coral">.</span> — flashcard{" "}
           {resolveSubjectWord(decks)} learning
         </p>
-        <h1 className="type-display text-5xl md:text-7xl">
+        {/* slightly looser than type-display's 0.95 so the greeting's descenders
+            (e.g. "guten") don't crowd the name on the second line */}
+        <h1 className="type-display text-5xl md:text-7xl" style={{ lineHeight: 1.1 }}>
           {greetingFor(greetingLang, currentHour())},
           <br />
           <span className="text-coral">{user.displayName.toLowerCase()}.</span>
