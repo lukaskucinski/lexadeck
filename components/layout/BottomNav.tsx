@@ -38,7 +38,7 @@ export function BottomNav() {
           <Link
             key={href}
             href={href}
-            className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
+            className={`pressable flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
               active ? "text-ink" : "text-muted"
             }`}
           >

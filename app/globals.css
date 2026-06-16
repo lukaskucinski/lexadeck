@@ -139,3 +139,30 @@ select option {
 .perspective-1200 {
   perspective: 1200px;
 }
+
+/* ---- tactile feedback (mobile press states) -------------- */
+/* kill the grey tap-flash + the 300ms double-tap delay on every control */
+button,
+a,
+[role="button"],
+label,
+summary {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* opt-in press affordance: a calm opacity dim on :active — clearly "pressed"
+   without a colour flash (the colour-invert version read as flashing on tap).
+   Opacity-only, so nothing to gate for reduced-motion. Hover colour-inverts
+   stay desktop-only via Tailwind's `hover:` variant. */
+.pressable {
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    opacity 120ms ease-out,
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+}
+.pressable:active {
+  opacity: 0.6;
+}

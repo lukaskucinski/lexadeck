@@ -1,5 +1,6 @@
 "use client";
 
+import { tap } from "@/lib/haptics";
 import { Rating, type Grade } from "@/lib/srs";
 
 const BUTTONS: { rating: Grade; label: string; varName: string }[] = [
@@ -25,8 +26,11 @@ export function ReviewButtons({
         <button
           key={label}
           disabled={disabled}
-          onClick={() => onRate(rating)}
-          className={`flex h-16 flex-col items-center justify-center gap-0.5 text-[0.8rem] font-extrabold tracking-[0.04em] uppercase transition-colors hover:bg-soft disabled:opacity-40 ${
+          onClick={() => {
+            tap();
+            onRate(rating);
+          }}
+          className={`pressable flex h-16 flex-col items-center justify-center gap-0.5 text-[0.8rem] font-extrabold tracking-[0.04em] uppercase hover:bg-soft disabled:opacity-40 ${
             i > 0 ? "border-l border-line" : ""
           }`}
         >

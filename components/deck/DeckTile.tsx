@@ -20,7 +20,7 @@ export function DeckTile({ deck }: { deck: DeckSummary }) {
   return (
     // the body is one link; the footer keeps its own links (no nested anchors)
     <div className="border-[1.5px] border-line bg-bg">
-      <Link href={`/decks/${deck.id}`} className="block transition-colors hover:bg-soft/30">
+      <Link href={`/decks/${deck.id}`} className="block pressable hover:bg-soft/30">
         <div className="flex items-baseline justify-between border-b border-line px-5 py-4">
           <span className="type-term text-2xl">{deck.name}</span>
           <span className="label-caps" style={{ color: accent }}>
@@ -70,7 +70,7 @@ export function DeckTile({ deck }: { deck: DeckSummary }) {
         {timeAgo(deck.lastStudied)}
         <Link
           href={`/decks/${deck.id}/cards/new`}
-          className="label-caps text-muted transition-colors hover:text-ink"
+          className="label-caps pressable text-muted hover:text-ink"
           title={`Add a card to ${deck.name}`}
         >
           + Card

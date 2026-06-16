@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { DeleteAccount } from "@/components/settings/DeleteAccount";
 import { StudyExcludeChips } from "@/components/settings/StudyExcludeChips";
 import { SoundToggle } from "@/components/study/SoundToggle";
+import { InstallButton } from "@/components/pwa/InstallButton";
 import { Button } from "@/components/ui/Button";
 import { signOut } from "@/lib/actions/auth";
 import { requireUser } from "@/lib/auth";
@@ -104,6 +105,15 @@ export default async function SettingsPage() {
         <Section title="Appearance">
           <Row label="Theme" hint="Light / dark — stored on this device">
             <ThemeToggle />
+          </Row>
+        </Section>
+
+        <Section title="App">
+          <Row
+            label="Install"
+            hint="Add LexaDeck to your home screen for a faster, full-screen launch"
+          >
+            <InstallButton />
           </Row>
         </Section>
 

@@ -45,10 +45,8 @@ export function NavRail() {
               key={href}
               href={href}
               title={label}
-              className={`flex h-10 w-10 items-center justify-center transition-colors ${
-                active
-                  ? "bg-ink text-bg"
-                  : "text-muted hover:bg-soft hover:text-ink"
+              className={`pressable flex h-10 w-10 items-center justify-center ${
+                active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
               }`}
             >
               <Icon size={19} strokeWidth={active ? 2.4 : 2} />
@@ -60,7 +58,7 @@ export function NavRail() {
       <Link
         href="/decks"
         title="Add cards"
-        className="mt-6 flex h-10 w-10 items-center justify-center border-[1.5px] border-line text-ink transition-colors hover:bg-ink hover:text-bg"
+        className="pressable mt-6 flex h-10 w-10 items-center justify-center border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg"
       >
         <Plus size={19} />
       </Link>
@@ -69,7 +67,7 @@ export function NavRail() {
         <Link
           href="/settings"
           title="Settings"
-          className={`flex h-10 w-10 items-center justify-center transition-colors ${
+          className={`pressable flex h-10 w-10 items-center justify-center ${
             isActive(pathname, "/settings")
               ? "bg-ink text-bg"
               : "text-muted hover:bg-soft hover:text-ink"
