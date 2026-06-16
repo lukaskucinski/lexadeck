@@ -3,34 +3,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Upload } from "lucide-react";
 import { toCardRow } from "@/components/card/cardRow";
-import { CardListTable } from "@/components/card/CardListTable";
-import { FilterPanel } from "@/components/card/FilterPanel";
-import { FlashCardPreview } from "@/components/card/FlashCardPreview";
-import { Pagination } from "@/components/card/Pagination";
-import { SearchBar } from "@/components/card/SearchBar";
-import { SortControl } from "@/components/card/SortControl";
+import { DeckCardView } from "@/components/card/DeckCardView";
 import { DeckSelectionBar } from "@/components/deck/DeckSelectionBar";
 import { EnrichPanel } from "@/components/deck/EnrichPanel";
-import { KanbanBoard } from "@/components/deck/KanbanBoard";
 import { LastDeckCookie } from "@/components/deck/LastDeckCookie";
-import { SelectHint } from "@/components/deck/SelectHint";
-import { ViewToggle } from "@/components/deck/ViewToggle";
 import { ButtonLink } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { getLanguageProfile } from "@/lib/ai/languages";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import {
-  buildCardWhere,
-  cardOrderBy,
-  getStudySessionCounts,
-  parseCardViewParams,
-} from "@/lib/queries";
+import { getStudySessionCounts } from "@/lib/queries";
 import { parseStudyExclude, STUDY_EXCLUDE_COOKIE } from "@/lib/study";
 
 export const dynamic = "force-dynamic";
-
-const PAGE_SIZE = 60;
 
 const CARD_SELECT = {
   id: true,
@@ -42,10 +26,20 @@ const CARD_SELECT = {
   cardType: true,
   emoji: true,
   due: true,
+  createdAt: true,
   state: true,
   stability: true,
   masteredAt: true,
 } as const;
+
+/** Keep only the string search params for the client view's initial state. */
+function queryString(sp: Record<string, string | string[] | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(sp)) {
+    if (typeof value === "string") params.set(key, value);
+  }
+  return params.toString();
+}
 
 export default async function DeckDetailPage({
   params,
@@ -55,7 +49,6 @@ export default async function DeckDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const vp = parseCardViewParams(sp);
   const now = new Date();
 
   const user = await requireUser();
@@ -63,63 +56,15 @@ export default async function DeckDetailPage({
   if (!deck) notFound();
 
   const studyExclude = parseStudyExclude((await cookies()).get(STUDY_EXCLUDE_COOKIE)?.value);
-  const where = { deckId: id, ...buildCardWhere(vp.filters, now) };
-  const [total, ready, session] = await Promise.all([
+  // Load ALL of the deck's cards once; view/sort/filter/search/pagination then
+  // happen client-side (instant) in DeckCardView. Counts stay deck-wide.
+  const [total, ready, session, cards] = await Promise.all([
     prisma.card.count({ where: { deckId: id } }),
     prisma.card.count({ where: { deckId: id, due: { lte: now }, masteredAt: null } }),
     getStudySessionCounts(id, now, studyExclude),
+    prisma.card.findMany({ where: { deckId: id }, select: CARD_SELECT }),
   ]);
-
-  let content: React.ReactNode;
-
-  if (vp.view === "kanban") {
-    const cards = await prisma.card.findMany({
-      where,
-      orderBy: cardOrderBy(vp.sort, vp.dir),
-      select: CARD_SELECT,
-    });
-    const rows = cards.map((c) => toCardRow(c, now));
-    content =
-      rows.length === 0 ? (
-        <EmptyState title="no cards match">Adjust filters or add a card.</EmptyState>
-      ) : (
-        <KanbanBoard cards={rows} deckId={id} />
-      );
-  } else {
-    const [cards, filteredTotal] = await Promise.all([
-      prisma.card.findMany({
-        where,
-        orderBy: cardOrderBy(vp.sort, vp.dir),
-        select: CARD_SELECT,
-        skip: (vp.page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-      }),
-      prisma.card.count({ where }),
-    ]);
-    const rows = cards.map((c) => toCardRow(c, now));
-
-    if (rows.length === 0) {
-      content = <EmptyState title="no cards match">Adjust filters or add a card.</EmptyState>;
-    } else if (vp.view === "list") {
-      content = (
-        <>
-          <CardListTable cards={rows} sort={vp.sort} dir={vp.dir} selectionKey={id} />
-          <Pagination page={vp.page} pageSize={PAGE_SIZE} total={filteredTotal} />
-        </>
-      );
-    } else {
-      content = (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {rows.map((card) => (
-              <FlashCardPreview key={card.id} card={card} selectionKey={id} />
-            ))}
-          </div>
-          <Pagination page={vp.page} pageSize={PAGE_SIZE} total={filteredTotal} />
-        </>
-      );
-    }
-  }
+  const rows = cards.map((c) => toCardRow(c, now));
 
   // enrichment opens to any tuned language (es/ja/de); structured conjugation
   // tables are language-specific (Spanish only until Phase 2).
@@ -177,19 +122,7 @@ export default async function DeckDetailPage({
         </div>
       </header>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <ViewToggle active={vp.view} />
-          <SelectHint />
-        </div>
-        <div className="flex items-center gap-3">
-          <SearchBar />
-          <SortControl />
-          <FilterPanel />
-        </div>
-      </div>
-
-      {content}
+      <DeckCardView cards={rows} deckId={id} initialQuery={queryString(sp)} />
     </div>
   );
 }
