@@ -13,6 +13,7 @@ export interface CardRow {
   emoji: string | null;
   srs: SRSState;
   due: Date;
+  createdAt: Date;
   deckName?: string;
 }
 
@@ -26,6 +27,7 @@ interface CardLike {
   cardType: string;
   emoji: string | null;
   due: Date;
+  createdAt: Date;
   state: number;
   stability: number;
   masteredAt?: Date | null;
@@ -43,6 +45,7 @@ export function toCardRow(card: CardLike, now: Date, deckName?: string): CardRow
     emoji: card.emoji,
     srs: getSRSState(card, now),
     due: card.due,
+    createdAt: card.createdAt,
     deckName,
   };
 }
