@@ -7,6 +7,7 @@ import { StudyExcludeChips } from "@/components/settings/StudyExcludeChips";
 import { SoundToggle } from "@/components/study/SoundToggle";
 import { InstallButton } from "@/components/pwa/InstallButton";
 import { Button } from "@/components/ui/Button";
+import { ReplayWalkthroughButton } from "@/components/walkthrough/ReplayWalkthroughButton";
 import { signOut } from "@/lib/actions/auth";
 import { requireUser } from "@/lib/auth";
 import {
@@ -114,6 +115,9 @@ export default async function SettingsPage() {
             hint="Add LexaDeck to your home screen for a faster, full-screen launch"
           >
             <InstallButton />
+          </Row>
+          <Row label="Feature walkthrough" hint="Replay the quick tour of the core features">
+            <ReplayWalkthroughButton />
           </Row>
         </Section>
 

@@ -29,6 +29,7 @@ type ProfileWrite = {
   cefrLevel?: string | null;
   acceptedTermsAt?: Date | null;
   onboardingCompletedAt?: Date | null;
+  walkthroughSeenAt?: Date | null;
 };
 
 /** Create-or-update the signed-in user's Profile. */

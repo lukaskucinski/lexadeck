@@ -118,6 +118,7 @@ model Profile {
   cefrLevel             String? // A1..C2; null = unknown / not a language learner
   acceptedTermsAt       DateTime? // AI-content disclaimer + T&C consent
   onboardingCompletedAt DateTime?
+  walkthroughSeenAt     DateTime? // first-run feature tour shown/skipped; null = show it
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 }
