@@ -47,4 +47,7 @@ design-spike/check-*.png
 # prisma generated client
 lib/generated/
 
+# local agent worktrees (registered git worktrees / leftover dirs)
+.claude/worktrees/
+
 .vercel

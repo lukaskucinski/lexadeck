@@ -84,4 +84,25 @@ describe("buildEnrichmentPrompt", () => {
       expect(buildEnrichmentPrompt(es, [card], "astrology")).toBe(base);
     });
   });
+
+  describe("per-CEFR level", () => {
+    const es = getLanguageProfile("es")!;
+
+    it("defaults to A2/B1 in the preamble", () => {
+      expect(buildEnrichmentPrompt(es, [card])).toContain("(A2/B1 level)");
+    });
+
+    it("uses the learner's level when provided", () => {
+      const p = buildEnrichmentPrompt(es, [card], undefined, "B2");
+      expect(p).toContain("(B2 level)");
+      expect(p).not.toContain("(A2/B1 level)");
+    });
+
+    it("is byte-identical to the default when level is unset or invalid", () => {
+      const base = buildEnrichmentPrompt(es, [card]);
+      expect(buildEnrichmentPrompt(es, [card], undefined, null)).toBe(base);
+      expect(buildEnrichmentPrompt(es, [card], undefined, "")).toBe(base);
+      expect(buildEnrichmentPrompt(es, [card], undefined, "Z9")).toBe(base);
+    });
+  });
 });

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { ActionState } from "@/lib/actions/decks";
-import { isEnrichable } from "@/lib/ai/languages";
+import { isEnrichable, PICKER_LANGUAGES } from "@/lib/ai/languages";
 import { DEFAULT_SUBJECT, isLanguageSubject, SUBJECT_OPTIONS } from "@/lib/ai/subjects";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
@@ -18,20 +18,7 @@ const ACCENTS = [
   "lavender",
 ] as const;
 
-// Curated picker list; AI-enrichable languages (es/ja/de) are flagged at render.
-const LANGUAGES: { code: string; name: string }[] = [
-  { code: "es", name: "Spanish" },
-  { code: "de", name: "German" },
-  { code: "ja", name: "Japanese" },
-  { code: "en", name: "English" },
-  { code: "fr", name: "French" },
-  { code: "it", name: "Italian" },
-  { code: "pt", name: "Portuguese" },
-  { code: "zh", name: "Chinese" },
-  { code: "ko", name: "Korean" },
-  { code: "ru", name: "Russian" },
-  { code: "ar", name: "Arabic" },
-];
+const LANGUAGES = PICKER_LANGUAGES;
 
 export interface DeckFormValues {
   name?: string;

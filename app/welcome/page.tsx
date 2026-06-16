@@ -95,7 +95,10 @@ export default async function WelcomePage() {
             <ButtonLink href="/login" className="h-12 px-7">
               Sign in →
             </ButtonLink>
-            <p className="label-caps text-muted">private beta — invite only</p>
+            <ButtonLink href="/signup" variant="outline" className="h-12 px-7">
+              Create account
+            </ButtonLink>
+            <p className="label-caps text-muted">private beta — request access</p>
           </div>
 
           <p className="label-caps mt-16 text-muted">↓ see it in action</p>
@@ -147,7 +150,10 @@ export default async function WelcomePage() {
               <ButtonLink href="/login" className="h-12 px-7">
                 Sign in →
               </ButtonLink>
-              <p className="label-caps text-muted">private beta — invite only</p>
+              <ButtonLink href="/signup" variant="outline" className="h-12 px-7">
+                Create account
+              </ButtonLink>
+              <p className="label-caps text-muted">private beta — request access</p>
             </div>
           </Reveal>
         </section>

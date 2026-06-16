@@ -315,6 +315,7 @@ export async function geminiEnrich(
   cards: EnrichableCard[],
   profile: LanguageProfile = DEFAULT_PROFILE,
   subject?: string,
+  level?: string | null,
 ): Promise<RawEnrichment[]> {
   const key = env("GEMINI_API_KEY");
   const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
@@ -324,7 +325,7 @@ export async function geminiEnrich(
   const fallback = env("GEMINI_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
   if (!key) throw new Error("GEMINI_API_KEY is not set");
 
-  const prompt = buildEnrichmentPrompt(profile, cards, subject);
+  const prompt = buildEnrichmentPrompt(profile, cards, subject, level);
 
   try {
     return await geminiGenerate(model, key, prompt);

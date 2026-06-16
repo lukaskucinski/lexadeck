@@ -1,12 +1,17 @@
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CommandPaletteLoader } from "@/components/layout/CommandPaletteLoader";
 import { NavRail } from "@/components/layout/NavRail";
+import { requireOnboardedUser } from "@/lib/profile";
 
-export default function MainLayout({
+export default async function MainLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Gate every authenticated page: not allowlisted → /request-access;
+  // not onboarded → /onboarding. (Prisma can't run in proxy.ts/edge.)
+  await requireOnboardedUser();
+
   return (
     <>
       <NavRail />
