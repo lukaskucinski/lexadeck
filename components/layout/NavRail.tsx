@@ -10,6 +10,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
+import { PendingDim } from "@/components/ui/PendingDim";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_ITEMS = [
@@ -41,39 +42,36 @@ export function NavRail() {
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
-            <Link
-              key={href}
-              href={href}
-              title={label}
-              className={`pressable flex h-10 w-10 items-center justify-center ${
-                active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
-              }`}
-            >
-              <Icon size={19} strokeWidth={active ? 2.4 : 2} />
+            <Link key={href} href={href} title={label} className="flex">
+              <PendingDim
+                className={`pressable flex h-10 w-10 items-center justify-center ${
+                  active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
+                }`}
+              >
+                <Icon size={19} strokeWidth={active ? 2.4 : 2} />
+              </PendingDim>
             </Link>
           );
         })}
       </div>
 
-      <Link
-        href="/decks"
-        title="Add cards"
-        className="pressable mt-6 flex h-10 w-10 items-center justify-center border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg"
-      >
-        <Plus size={19} />
+      <Link href="/decks" title="Add cards" className="mt-6 flex">
+        <PendingDim className="pressable flex h-10 w-10 items-center justify-center border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg">
+          <Plus size={19} />
+        </PendingDim>
       </Link>
 
       <div className="mt-auto flex flex-col items-center gap-1.5">
-        <Link
-          href="/settings"
-          title="Settings"
-          className={`pressable flex h-10 w-10 items-center justify-center ${
-            isActive(pathname, "/settings")
-              ? "bg-ink text-bg"
-              : "text-muted hover:bg-soft hover:text-ink"
-          }`}
-        >
-          <Settings size={19} />
+        <Link href="/settings" title="Settings" className="flex">
+          <PendingDim
+            className={`pressable flex h-10 w-10 items-center justify-center ${
+              isActive(pathname, "/settings")
+                ? "bg-ink text-bg"
+                : "text-muted hover:bg-soft hover:text-ink"
+            }`}
+          >
+            <Settings size={19} />
+          </PendingDim>
         </Link>
         <ThemeToggle />
       </div>

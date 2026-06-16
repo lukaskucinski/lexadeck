@@ -12,6 +12,7 @@ import {
   useIsSelected,
 } from "@/components/deck/useDeckSelection";
 import { useLongPress } from "@/components/deck/useLongPress";
+import { PendingDim } from "@/components/ui/PendingDim";
 import { CardActionsMenu } from "./CardActionsMenu";
 import type { CardRow } from "./cardRow";
 
@@ -48,10 +49,13 @@ export function FlashCardPreview({ card, selectionKey }: { card: CardRow; select
           }
           // otherwise: let the Link open the card
         }}
-        className={`flex min-h-36 flex-col border-[1.5px] bg-bg transition-colors hover:bg-soft/30 ${
-          selected ? "border-ink ring-1 ring-ink" : "border-line"
-        }`}
+        className="block"
       >
+        <PendingDim
+          className={`flex min-h-36 flex-col border-[1.5px] bg-bg transition-[opacity,background-color] duration-150 hover:bg-soft/30 ${
+            selected ? "border-ink ring-1 ring-ink" : "border-line"
+          }`}
+        >
         <div className="flex items-center justify-between gap-2 border-b border-soft px-3.5 py-2">
           <span className="label-caps inline-flex items-center gap-2 text-muted">
             <i className="h-2.5 w-2.5" style={{ background: wordTypeVar(card.wordType) }} />
@@ -73,6 +77,7 @@ export function FlashCardPreview({ card, selectionKey }: { card: CardRow; select
             {card.translation ?? "—"}
           </div>
         </div>
+        </PendingDim>
       </Link>
 
       <CardActionsMenu

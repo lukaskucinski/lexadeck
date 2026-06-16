@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +9,7 @@ import { DeckSelectionBar } from "@/components/deck/DeckSelectionBar";
 import { EnrichPanel } from "@/components/deck/EnrichPanel";
 import { LastDeckCookie } from "@/components/deck/LastDeckCookie";
 import { ButtonLink } from "@/components/ui/Button";
+import { Bar, SkeletonScreen } from "@/components/ui/Skeleton";
 import { getLanguageProfile } from "@/lib/ai/languages";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -41,6 +43,58 @@ function queryString(sp: Record<string, string | string[] | undefined>): string 
   return params.toString();
 }
 
+/**
+ * The heavy part of the page: loading ALL of a deck's cards. Split into its own
+ * async component so the page can wrap it in <Suspense> — the lightweight shell
+ * (header + counts) commits as soon as ownership is confirmed, and the full card
+ * list streams in behind the skeleton. The page's notFound() runs upstream of
+ * this boundary, so a foreign/missing deck still returns a real 404 (no
+ * route-level loading.tsx here — that would flush 200 first; see isolation-smoke).
+ */
+async function DeckCardsSection({
+  deckId,
+  now,
+  initialQuery,
+}: {
+  deckId: string;
+  now: Date;
+  initialQuery: string;
+}) {
+  const cards = await prisma.card.findMany({ where: { deckId }, select: CARD_SELECT });
+  const rows = cards.map((c) => toCardRow(c, now));
+  return <DeckCardView cards={rows} deckId={deckId} initialQuery={initialQuery} />;
+}
+
+/** Calm fallback shaped like DeckCardView (controls bar + card grid). */
+function DeckCardsSkeleton() {
+  return (
+    <SkeletonScreen>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Bar className="h-9 w-28" />
+        <div className="flex items-center gap-3">
+          <Bar className="h-9 w-40" />
+          <Bar className="h-9 w-20" />
+          <Bar className="h-9 w-20" />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex min-h-36 flex-col border-[1.5px] border-line">
+            <div className="flex items-center justify-between border-b border-soft px-3.5 py-2">
+              <Bar className="h-2.5 w-16" />
+              <Bar className="h-2.5 w-2.5" />
+            </div>
+            <div className="flex flex-1 flex-col justify-center gap-2 px-3.5 py-3">
+              <Bar className="h-5 w-3/4" />
+              <Bar className="h-3 w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </SkeletonScreen>
+  );
+}
+
 export default async function DeckDetailPage({
   params,
   searchParams,
@@ -56,15 +110,13 @@ export default async function DeckDetailPage({
   if (!deck) notFound();
 
   const studyExclude = parseStudyExclude((await cookies()).get(STUDY_EXCLUDE_COOKIE)?.value);
-  // Load ALL of the deck's cards once; view/sort/filter/search/pagination then
-  // happen client-side (instant) in DeckCardView. Counts stay deck-wide.
-  const [total, ready, session, cards] = await Promise.all([
+  // Header counts only — cheap aggregates. The deck's cards (the heavy load)
+  // stream separately via <DeckCardsSection> so the header paints immediately.
+  const [total, ready, session] = await Promise.all([
     prisma.card.count({ where: { deckId: id } }),
     prisma.card.count({ where: { deckId: id, due: { lte: now }, masteredAt: null } }),
     getStudySessionCounts(id, now, studyExclude),
-    prisma.card.findMany({ where: { deckId: id }, select: CARD_SELECT }),
   ]);
-  const rows = cards.map((c) => toCardRow(c, now));
 
   // enrichment opens to any tuned language (es/ja/de); structured conjugation
   // tables are language-specific (Spanish only until Phase 2).
@@ -122,7 +174,9 @@ export default async function DeckDetailPage({
         </div>
       </header>
 
-      <DeckCardView cards={rows} deckId={id} initialQuery={queryString(sp)} />
+      <Suspense fallback={<DeckCardsSkeleton />}>
+        <DeckCardsSection deckId={id} now={now} initialQuery={queryString(sp)} />
+      </Suspense>
     </div>
   );
 }
