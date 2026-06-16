@@ -7,9 +7,11 @@ import {
   House,
   Layers,
   LibraryBig,
+  type LucideIcon,
   Plus,
   Settings,
 } from "lucide-react";
+import { useTourActive, useTourHighlight } from "@/components/walkthrough/useTourHighlight";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_ITEMS = [
@@ -19,15 +21,48 @@ const NAV_ITEMS = [
   { href: "/progress", label: "Progress", icon: ChartNoAxesColumn },
 ] as const;
 
+// A 2px coral ring used to spotlight a nav item during the first-run tour.
+const TOUR_GLOW = "shadow-[0_0_0_2px_var(--c-coral)]";
+
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
+function NavRailItem({
+  href,
+  label,
+  Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  Icon: LucideIcon;
+  active: boolean;
+}) {
+  const lit = useTourHighlight(href);
+  return (
+    <Link
+      href={href}
+      title={label}
+      className={`pressable relative flex h-10 w-10 items-center justify-center ${
+        active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
+      } ${lit ? TOUR_GLOW : ""}`}
+    >
+      <Icon size={19} strokeWidth={active ? 2.4 : 2} />
+    </Link>
+  );
+}
+
 export function NavRail() {
   const pathname = usePathname();
+  const tourActive = useTourActive();
 
   return (
-    <nav className="fixed inset-y-0 left-0 z-40 hidden w-16 flex-col items-center border-r-[1.5px] border-line bg-bg py-5 md:flex">
+    <nav
+      className={`fixed inset-y-0 left-0 hidden w-16 flex-col items-center border-r-[1.5px] border-line bg-bg py-5 md:flex ${
+        tourActive ? "pointer-events-none z-[55]" : "z-40"
+      }`}
+    >
       <Link
         href="/"
         className="type-term mb-7 text-[1.45rem] text-ink"
@@ -38,21 +73,15 @@ export function NavRail() {
       </Link>
 
       <div className="flex flex-col items-center gap-1.5">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={label}
-              className={`pressable flex h-10 w-10 items-center justify-center ${
-                active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
-              }`}
-            >
-              <Icon size={19} strokeWidth={active ? 2.4 : 2} />
-            </Link>
-          );
-        })}
+        {NAV_ITEMS.map(({ href, label, icon }) => (
+          <NavRailItem
+            key={href}
+            href={href}
+            label={label}
+            Icon={icon}
+            active={isActive(pathname, href)}
+          />
+        ))}
       </div>
 
       <Link
@@ -64,17 +93,12 @@ export function NavRail() {
       </Link>
 
       <div className="mt-auto flex flex-col items-center gap-1.5">
-        <Link
+        <NavRailItem
           href="/settings"
-          title="Settings"
-          className={`pressable flex h-10 w-10 items-center justify-center ${
-            isActive(pathname, "/settings")
-              ? "bg-ink text-bg"
-              : "text-muted hover:bg-soft hover:text-ink"
-          }`}
-        >
-          <Settings size={19} />
-        </Link>
+          label="Settings"
+          Icon={Settings}
+          active={isActive(pathname, "/settings")}
+        />
         <ThemeToggle />
       </div>
     </nav>
