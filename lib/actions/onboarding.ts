@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { parseOnboarding, profileFromOnboarding } from "@/lib/onboarding";
+import { hasPlacementTest } from "@/lib/placement/items";
 import { upsertProfile } from "@/lib/profile";
 import { createSpanishStarterDeck } from "@/lib/starter/es-starter";
 
@@ -46,10 +47,19 @@ export async function completeOnboarding(
 
   // Optional curated starter — only meaningful for a Spanish language learner.
   // primaryLanguage === "es" implies the Languages subject (domain decks store null).
+  let starterDeckId: string | null = null;
   if (formData.get("starterDeck") === "on" && primaryLanguage === "es") {
-    const deckId = await createSpanishStarterDeck(user.id);
-    redirect(`/decks/${deckId}`);
+    starterDeckId = await createSpanishStarterDeck(user.id);
   }
 
+  // A language learner who left their level as "I'm not sure" gets a quick
+  // placement quiz next (Spanish only for now). Carry the freshly-created starter
+  // deck so "Continue" after the quiz still lands on it.
+  if (cefrLevel == null && hasPlacementTest(primaryLanguage)) {
+    const deckParam = starterDeckId ? `&deck=${starterDeckId}` : "";
+    redirect(`/placement?from=onboarding${deckParam}`);
+  }
+
+  if (starterDeckId) redirect(`/decks/${starterDeckId}`);
   redirect("/");
 }

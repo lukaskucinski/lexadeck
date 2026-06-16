@@ -8,6 +8,8 @@ import { SoundToggle } from "@/components/study/SoundToggle";
 import { Button } from "@/components/ui/Button";
 import { signOut } from "@/lib/actions/auth";
 import { requireUser } from "@/lib/auth";
+import { hasPlacementTest } from "@/lib/placement/items";
+import { getProfile } from "@/lib/profile";
 import {
   MAX_NEW_PER_SESSION,
   MAX_SESSION_SIZE,
@@ -91,6 +93,7 @@ function ProviderDot({ configured }: { configured: boolean }) {
 
 export default async function SettingsPage() {
   const user = await requireUser();
+  const profile = await getProfile(user.id);
   const azure = Boolean(process.env.AZURE_TRANSLATOR_KEY && process.env.AZURE_TRANSLATOR_REGION);
   const gemini = Boolean(process.env.GEMINI_API_KEY);
   const deepl = Boolean(process.env.DEEPL_API_KEY);
@@ -164,6 +167,24 @@ export default async function SettingsPage() {
             </form>
           </Row>
         </Section>
+
+        {profile?.primaryLanguage && (
+          <Section title="Language level">
+            <Row label="Current level" hint="CEFR band — tunes AI enrichment to your level">
+              <StaticValue>{profile.cefrLevel ?? "Not set"}</StaticValue>
+            </Row>
+            {hasPlacementTest(profile.primaryLanguage) && (
+              <Row label="Placement test" hint="A 2-minute quiz to find or update your level">
+                <Link
+                  href="/placement?from=settings"
+                  className="label-caps border-[1.5px] border-line px-3 py-1.5 transition-colors hover:bg-ink hover:text-bg"
+                >
+                  {profile.cefrLevel ? "Re-take" : "Take test"}
+                </Link>
+              </Row>
+            )}
+          </Section>
+        )}
 
         <Section title="Data">
           <Row label="Deck import" hint="CSV/TSV wizard with template, preview and dupe-skip">
