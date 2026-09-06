@@ -85,18 +85,42 @@ export async function deeplTranslate(
   return data.translations.map((t) => t.text);
 }
 
+/**
+ * Translate `texts` with a graceful fallback chain: Azure (primary) → DeepL
+ * (only when ENABLE_DEEPL_FALLBACK) → Gemini (whenever GEMINI_API_KEY is set).
+ * Each tier is tried in order; a tier's failure cascades to the next, and the
+ * last error propagates if every configured provider fails. Gemini is auto-on
+ * as the last resort so translation survives an Azure outage/expiry with no
+ * extra config — the same key that powers enrichment. Note this costs one extra
+ * Gemini request per translated batch, against that key's daily free-tier quota.
+ */
 export async function translateBatch(
   texts: string[],
   profile: LanguageProfile = DEFAULT_PROFILE,
 ): Promise<{ provider: string; out: string[] }> {
   try {
     return { provider: "azure", out: await azureTranslate(texts, profile) };
-  } catch (err) {
+  } catch (azureErr) {
+    const fallbacks: { provider: string; run: () => Promise<string[]> }[] = [];
     if (env("ENABLE_DEEPL_FALLBACK") === "true") {
-      console.warn(`Azure failed (${(err as Error).message}); falling back to DeepL`);
-      return { provider: "deepl_fallback", out: await deeplTranslate(texts, profile) };
+      fallbacks.push({ provider: "deepl_fallback", run: () => deeplTranslate(texts, profile) });
     }
-    throw err;
+    if (env("GEMINI_API_KEY")) {
+      fallbacks.push({ provider: "gemini_fallback", run: () => geminiTranslate(texts, profile) });
+    }
+
+    let lastErr = azureErr;
+    for (const fb of fallbacks) {
+      try {
+        console.warn(
+          `Translation falling back to ${fb.provider} after: ${(lastErr as Error).message}`,
+        );
+        return { provider: fb.provider, out: await fb.run() };
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr;
   }
 }
 
@@ -335,6 +359,58 @@ export async function geminiEnrich(
         `Gemini ${model} unavailable (${(err as Error).message.slice(0, 120)}…) — retrying with ${fallback}`,
       );
       return geminiGenerate(fallback, key, prompt);
+    }
+    throw err;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Gemini: term translation — the last-resort fallback for translateBatch */
+/* when Azure (and DeepL, if enabled) are unavailable.                  */
+/* ------------------------------------------------------------------ */
+
+/** One concise English gloss per input term, same order (array of strings). */
+const TRANSLATION_SCHEMA = { type: "ARRAY", items: { type: "STRING" } } as const;
+
+function buildTranslationPrompt(profile: LanguageProfile, texts: string[]): string {
+  return [
+    `Translate each of the following ${profile.name} terms into English.`,
+    "Return a JSON array of strings — one concise, dictionary-style translation per term,",
+    "in the same order as given. No commentary, quotes, or numbering in the values.",
+    "",
+    ...texts.map((t, i) => `${i + 1}. ${t}`),
+  ].join("\n");
+}
+
+/**
+ * Translate terms with Gemini structured output. Mirrors geminiEnrich's
+ * model + GEMINI_FALLBACK_MODEL retry on transient (429/5xx) failures. Callers
+ * index the result positionally, so it maps 1:1 to `texts`.
+ */
+export async function geminiTranslate(
+  texts: string[],
+  profile: LanguageProfile = DEFAULT_PROFILE,
+): Promise<string[]> {
+  const key = env("GEMINI_API_KEY");
+  const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
+  const fallback = env("GEMINI_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
+  if (!key) throw new Error("GEMINI_API_KEY is not set");
+
+  const prompt = buildTranslationPrompt(profile, texts);
+  const run = async (m: string): Promise<string[]> => {
+    const parsed = await geminiRequest(m, key, prompt, TRANSLATION_SCHEMA);
+    if (!Array.isArray(parsed)) throw new Error("Gemini translation response is not an array");
+    return parsed.map((t) => (typeof t === "string" ? t.trim() : ""));
+  };
+
+  try {
+    return await run(model);
+  } catch (err) {
+    if (fallback && fallback !== model && isRetryable(err)) {
+      console.warn(
+        `Gemini ${model} unavailable (${(err as Error).message.slice(0, 120)}…) — retrying with ${fallback}`,
+      );
+      return run(fallback);
     }
     throw err;
   }

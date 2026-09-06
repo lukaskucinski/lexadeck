@@ -51,8 +51,10 @@ Supabase account June 2026 — the MCP must be authenticated against that accoun
   `E2E_EMAIL`/`E2E_PASSWORD` from `.env`; user creation/rotation is
   `scripts/create-users.ts` (credentials land in gitignored `.env.credentials`,
   never in chat/logs).
-- **AI providers**: Azure Translator F0 (DeepL fallback) = translation; Gemini =
-  enrichment — in-app ("AI enrich" on the card page; keys are Vercel env vars) and
+- **AI providers**: translation = Azure Translator F0 → DeepL (if enabled) →
+  Gemini (auto-on when `GEMINI_API_KEY` is set), chained in `translateBatch` so
+  auto-fill survives an Azure expiry; Gemini = enrichment — in-app ("AI enrich"
+  on the card page; keys are Vercel env vars) and
   bulk local scripts. Enrichment is **language-aware** via a profile registry
   (`lib/ai/languages.ts`): `es` / `ja` / `de` are enrichable today and
   `isEnrichable()` gates every UI/action; structured conjugation tables are still

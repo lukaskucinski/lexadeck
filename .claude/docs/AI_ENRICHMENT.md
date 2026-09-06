@@ -7,8 +7,14 @@ and, where relevant, a pronunciation reading). As of PR #16 the whole stack is
 
 ## Providers
 
-- **Translation** — Azure Translator (F0 tier), with **DeepL as a fallback** when
-  configured. Always translates the deck language → English.
+- **Translation** — `translateBatch` tries **Azure Translator** (F0 tier) →
+  **DeepL** (only when `ENABLE_DEEPL_FALLBACK=true`) → **Gemini** (auto-on
+  whenever `GEMINI_API_KEY` is set). Each tier's failure cascades to the next, so
+  auto-fill survives an Azure outage/expiry (e.g. a 401 from a lapsed subscription)
+  with no extra config — at the cost of one extra Gemini call per batch against
+  that key's daily quota. The result carries a `provider` tag
+  (`azure` / `deepl_fallback` / `gemini_fallback`). Always translates the deck
+  language → English.
 - **Enrichment** — Google **Gemini**. One generic prompt, parameterized per
   language (below). Keys are Vercel env vars in prod; local scripts read `.env`.
 - Gemini free tier caps `gemini-2.5-flash` at ~20 req/day on this account — for
