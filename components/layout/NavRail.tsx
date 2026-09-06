@@ -11,6 +11,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
+import { PendingDim } from "@/components/ui/PendingDim";
 import { useTourActive, useTourHighlight } from "@/components/walkthrough/useTourHighlight";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -39,16 +40,18 @@ function NavRailItem({
   Icon: LucideIcon;
   active: boolean;
 }) {
+  // `lit` = the first-run tour is spotlighting this item (coral ring); PendingDim
+  // keeps the "hold the dim" pending feedback while a tap's navigation resolves.
   const lit = useTourHighlight(href);
   return (
-    <Link
-      href={href}
-      title={label}
-      className={`pressable relative flex h-10 w-10 items-center justify-center ${
-        active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
-      } ${lit ? TOUR_GLOW : ""}`}
-    >
-      <Icon size={19} strokeWidth={active ? 2.4 : 2} />
+    <Link href={href} title={label} className="flex">
+      <PendingDim
+        className={`pressable flex h-10 w-10 items-center justify-center ${
+          active ? "bg-ink text-bg" : "text-muted hover:bg-soft hover:text-ink"
+        } ${lit ? TOUR_GLOW : ""}`}
+      >
+        <Icon size={19} strokeWidth={active ? 2.4 : 2} />
+      </PendingDim>
     </Link>
   );
 }
@@ -84,12 +87,10 @@ export function NavRail() {
         ))}
       </div>
 
-      <Link
-        href="/decks"
-        title="Add cards"
-        className="pressable mt-6 flex h-10 w-10 items-center justify-center border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg"
-      >
-        <Plus size={19} />
+      <Link href="/decks" title="Add cards" className="mt-6 flex">
+        <PendingDim className="pressable flex h-10 w-10 items-center justify-center border-[1.5px] border-line text-ink hover:bg-ink hover:text-bg">
+          <Plus size={19} />
+        </PendingDim>
       </Link>
 
       <div className="mt-auto flex flex-col items-center gap-1.5">

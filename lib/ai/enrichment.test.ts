@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { azureTranslate, geminiEnrich, normalizeEnrichment } from "./enrichment";
+import {
+  azureTranslate,
+  geminiEnrich,
+  geminiTranslate,
+  normalizeEnrichment,
+  translateBatch,
+} from "./enrichment";
 import { getLanguageProfile } from "./languages";
 
 // Values pasted into the Vercel dashboard can carry a BOM (U+FEFF) — these
@@ -253,5 +259,155 @@ describe("azureTranslate direction by profile", () => {
 
     await azureTranslate(["犬"], getLanguageProfile("ja")!);
     expect(fetchMock.mock.calls[0][0]).toContain("from=ja&to=en");
+  });
+});
+
+describe("geminiTranslate", () => {
+  const geminiTexts = (texts: string[]) =>
+    okJson({ candidates: [{ content: { parts: [{ text: JSON.stringify(texts) }] } }] });
+
+  it("translates terms via the Gemini structured-output endpoint (trimmed, in order)", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+    vi.stubEnv("GEMINI_MODEL", "");
+    vi.stubEnv("GEMINI_FALLBACK_MODEL", "");
+
+    const fetchMock = vi.fn().mockResolvedValue(geminiTexts([" dog ", "cat"]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(geminiTranslate(["perro", "gato"])).resolves.toEqual(["dog", "cat"]);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("models/gemini-2.5-flash:generateContent?key=gem-key");
+    // prompt names the source language so the model translates in the right direction
+    expect(init.body).toContain("Spanish");
+    expect(init.body).toContain("perro");
+  });
+
+  it("names the deck's language in the prompt (Japanese profile)", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+    const fetchMock = vi.fn().mockResolvedValue(geminiTexts(["dog"]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await geminiTranslate(["犬"], getLanguageProfile("ja")!);
+    expect(fetchMock.mock.calls[0][1].body).toContain("Japanese");
+  });
+
+  it("treats a BOM/whitespace-only key as unset", async () => {
+    vi.stubEnv("GEMINI_API_KEY", `${BOM} `);
+    await expect(geminiTranslate(["perro"])).rejects.toThrow("GEMINI_API_KEY is not set");
+  });
+
+  it("retries on the fallback model when the primary returns 429", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+    vi.stubEnv("GEMINI_MODEL", "gemini-2.5-flash");
+    vi.stubEnv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash-lite");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, text: async () => "quota" })
+      .mockResolvedValueOnce(geminiTexts(["dog"]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(geminiTranslate(["perro"])).resolves.toEqual(["dog"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain("models/gemini-2.5-flash-lite:");
+  });
+});
+
+describe("translateBatch fallback chain", () => {
+  const azure401 = { ok: false, status: 401, text: async () => '{"error":{"code":401001}}' };
+  const geminiOut = (texts: string[]) =>
+    okJson({ candidates: [{ content: { parts: [{ text: JSON.stringify(texts) }] } }] });
+
+  const routed = (routes: { azure?: unknown; deepl?: unknown; gemini?: unknown }) =>
+    vi.fn(async (url: string) => {
+      if (url.includes("microsofttranslator.com") || url.includes("/translate?api-version"))
+        return routes.azure;
+      if (url.includes("deepl.com")) return routes.deepl;
+      if (url.includes("generativelanguage.googleapis.com")) return routes.gemini;
+      throw new Error(`unexpected url ${url}`);
+    });
+
+  it("returns the Azure result without any fallback when Azure succeeds", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_KEY", "k");
+    vi.stubEnv("AZURE_TRANSLATOR_REGION", "eastus");
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+
+    const fetchMock = routed({ azure: okJson([{ translations: [{ text: "dog" }] }]) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(translateBatch(["perro"])).resolves.toEqual({ provider: "azure", out: ["dog"] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to Gemini when Azure 401s and a Gemini key is present (DeepL off)", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_KEY", "k");
+    vi.stubEnv("AZURE_TRANSLATOR_REGION", "eastus");
+    vi.stubEnv("ENABLE_DEEPL_FALLBACK", "false");
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const fetchMock = routed({ azure: azure401, gemini: geminiOut(["smooth"]) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(translateBatch(["suave"])).resolves.toEqual({
+      provider: "gemini_fallback",
+      out: ["smooth"],
+    });
+  });
+
+  it("prefers DeepL over Gemini when DeepL fallback is enabled", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_KEY", "k");
+    vi.stubEnv("AZURE_TRANSLATOR_REGION", "eastus");
+    vi.stubEnv("ENABLE_DEEPL_FALLBACK", "true");
+    vi.stubEnv("DEEPL_API_KEY", "dk");
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const fetchMock = routed({
+      azure: azure401,
+      deepl: okJson({ translations: [{ text: "smooth" }] }),
+      gemini: geminiOut(["WRONG"]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(translateBatch(["suave"])).resolves.toEqual({
+      provider: "deepl_fallback",
+      out: ["smooth"],
+    });
+  });
+
+  it("cascades DeepL → Gemini when DeepL is enabled but fails", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_KEY", "k");
+    vi.stubEnv("AZURE_TRANSLATOR_REGION", "eastus");
+    vi.stubEnv("ENABLE_DEEPL_FALLBACK", "true");
+    vi.stubEnv("DEEPL_API_KEY", "dk");
+    vi.stubEnv("GEMINI_API_KEY", "gem-key");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const fetchMock = routed({
+      azure: azure401,
+      deepl: { ok: false, status: 456, text: async () => "quota exceeded" },
+      gemini: geminiOut(["smooth"]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(translateBatch(["suave"])).resolves.toEqual({
+      provider: "gemini_fallback",
+      out: ["smooth"],
+    });
+  });
+
+  it("throws the last error when Azure fails and no fallback is configured", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_KEY", "k");
+    vi.stubEnv("AZURE_TRANSLATOR_REGION", "eastus");
+    vi.stubEnv("ENABLE_DEEPL_FALLBACK", "false");
+    vi.stubEnv("GEMINI_API_KEY", "");
+
+    const fetchMock = routed({ azure: azure401 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(translateBatch(["suave"])).rejects.toThrow("Azure Translator 401");
   });
 });

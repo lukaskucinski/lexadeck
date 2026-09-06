@@ -10,6 +10,7 @@ import {
   type LucideIcon,
   Settings,
 } from "lucide-react";
+import { PendingDim } from "@/components/ui/PendingDim";
 import { useTourActive, useTourHighlight } from "@/components/walkthrough/useTourHighlight";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -39,16 +40,19 @@ function BottomNavItem({
   Icon: LucideIcon;
   active: boolean;
 }) {
+  // `lit` = the first-run tour is spotlighting this item (coral ring); PendingDim
+  // keeps the "hold the dim" pending feedback while a tap's navigation resolves.
   const lit = useTourHighlight(href);
   return (
-    <Link
-      href={href}
-      className={`pressable relative flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
-        active ? "text-ink" : "text-muted"
-      } ${lit ? TOUR_GLOW : ""}`}
-    >
-      <Icon size={20} strokeWidth={active ? 2.4 : 2} />
-      {label}
+    <Link href={href} className="flex">
+      <PendingDim
+        className={`pressable flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
+          active ? "text-ink" : "text-muted"
+        } ${lit ? TOUR_GLOW : ""}`}
+      >
+        <Icon size={20} strokeWidth={active ? 2.4 : 2} />
+        {label}
+      </PendingDim>
     </Link>
   );
 }

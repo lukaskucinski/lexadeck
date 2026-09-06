@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PendingDim } from "@/components/ui/PendingDim";
 import type { DeckSummary } from "@/lib/queries";
 
 const SEGMENTS = 20;
@@ -20,7 +21,8 @@ export function DeckTile({ deck }: { deck: DeckSummary }) {
   return (
     // the body is one link; the footer keeps its own links (no nested anchors)
     <div className="border-[1.5px] border-line bg-bg">
-      <Link href={`/decks/${deck.id}`} className="block pressable hover:bg-soft/30">
+      <Link href={`/decks/${deck.id}`} className="block">
+        <PendingDim className="block pressable hover:bg-soft/30">
         <div className="flex items-baseline justify-between border-b border-line px-5 py-4">
           <span className="type-term text-2xl">{deck.name}</span>
           <span className="label-caps" style={{ color: accent }}>
@@ -64,6 +66,7 @@ export function DeckTile({ deck }: { deck: DeckSummary }) {
             ))}
           </div>
         </div>
+        </PendingDim>
       </Link>
 
       <div className="flex items-center justify-between border-t border-line px-5 py-2.5 text-[0.7rem] font-semibold tracking-wide text-muted">

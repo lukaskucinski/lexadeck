@@ -7,13 +7,11 @@
  * right away — while the data-heavy dashboard RSC streams in behind it. Shaped
  * to match the dashboard (header + deck grid) so the swap is calm. No JS.
  */
-function Bar({ className }: { className?: string }) {
-  return <div className={`bg-soft ${className ?? ""}`} />;
-}
+import { Bar, SkeletonScreen } from "@/components/ui/Skeleton";
 
 export default function Loading() {
   return (
-    <div aria-busy="true" aria-label="Loading" className="animate-pulse">
+    <SkeletonScreen>
       <header className="border-b-[3px] border-line pb-8">
         <Bar className="h-3 w-56" />
         <Bar className="mt-5 h-11 w-80 max-w-full" />
@@ -31,6 +29,6 @@ export default function Loading() {
           </div>
         ))}
       </div>
-    </div>
+    </SkeletonScreen>
   );
 }

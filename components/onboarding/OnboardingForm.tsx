@@ -7,6 +7,7 @@ import { CEFR_LEVELS } from "@/lib/ai/cefr";
 import { isEnrichable, PICKER_LANGUAGES } from "@/lib/ai/languages";
 import { DEFAULT_SUBJECT, isLanguageSubject, SUBJECT_OPTIONS } from "@/lib/ai/subjects";
 import { AGE_RANGES } from "@/lib/onboarding";
+import { hasPlacementTest } from "@/lib/placement/items";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
@@ -76,7 +77,10 @@ export function OnboardingForm({
                 ))}
               </Select>
               <span className="mt-1.5 block text-[0.7rem] text-muted">
-                CEFR band — tunes AI enrichment to your level. Leave it if you don&apos;t know.
+                CEFR band — tunes AI enrichment to your level.{" "}
+                {hasPlacementTest(language)
+                  ? "Not sure? We'll offer a quick 2-minute level check next."
+                  : "Leave it if you don't know."}
               </span>
             </label>
           </>
