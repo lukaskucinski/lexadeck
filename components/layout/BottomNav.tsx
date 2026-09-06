@@ -9,6 +9,7 @@ import {
   LibraryBig,
   Settings,
 } from "lucide-react";
+import { PendingDim } from "@/components/ui/PendingDim";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_ITEMS = [
@@ -35,15 +36,15 @@ export function BottomNav() {
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
-          <Link
-            key={href}
-            href={href}
-            className={`pressable flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
-              active ? "text-ink" : "text-muted"
-            }`}
-          >
-            <Icon size={20} strokeWidth={active ? 2.4 : 2} />
-            {label}
+          <Link key={href} href={href} className="flex">
+            <PendingDim
+              className={`pressable flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.58rem] font-bold tracking-[0.14em] uppercase ${
+                active ? "text-ink" : "text-muted"
+              }`}
+            >
+              <Icon size={20} strokeWidth={active ? 2.4 : 2} />
+              {label}
+            </PendingDim>
           </Link>
         );
       })}

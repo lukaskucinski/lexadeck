@@ -71,6 +71,9 @@ function ListRow({
   onLibraryToggle: (id: string) => void;
 }) {
   const router = useRouter();
+  // per-row "hold the dim": the card route has no loading.tsx, so isPending
+  // stays true for the whole server render — dim just this row until it commits
+  const [navPending, startNav] = useTransition();
   const usingShared = !!selectionKey;
   const selectedShared = useIsSelected(selectionKey ?? "", card.id);
   const hasSelection = useHasSelection(selectionKey ?? "");
@@ -98,11 +101,11 @@ function ListRow({
             return;
           }
         }
-        router.push(`/decks/${card.deckId}/cards/${card.id}`);
+        startNav(() => router.push(`/decks/${card.deckId}/cards/${card.id}`));
       }}
-      className={`cursor-pointer border-b border-soft last:border-b-0 ${
-        highlighted ? "bg-soft" : "hover:bg-soft/25"
-      }`}
+      className={`cursor-pointer border-b border-soft transition-opacity duration-150 last:border-b-0 ${
+        navPending ? "opacity-60 " : ""
+      }${highlighted ? "bg-soft" : "hover:bg-soft/25"}`}
     >
       {/* checkbox cell swallows the row click (library only) */}
       {!usingShared && (
